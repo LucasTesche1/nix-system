@@ -195,9 +195,9 @@ const ClienteView = () => {
                         <Field label="Legenda" value={c.post.legenda} />
                       )}
 
-                      {c.tipo === "post" && c.post?.link_drive && (
+                      {c.tipo === "post" && c.post?.drive_url && (
                         <a
-                          href={c.post.link_drive}
+                          href={c.post.drive_url}
                           target="_blank" rel="noreferrer"
                           className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
                         >
