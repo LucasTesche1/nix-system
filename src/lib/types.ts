@@ -25,7 +25,7 @@ export interface Semana {
   id: string;
   calendario_id: string;
   ordem: number;
-  titulo: string | null;
+  nome: string | null;
   deleted_at?: string | null;
 }
 
