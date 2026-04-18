@@ -1,73 +1,16 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Plus, Calendar as CalIcon, ArrowRight, Loader2 } from "lucide-react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { Button } from "@/components/ui/button";
-import { fetchCalendarios } from "@/lib/queries";
-import { supabase } from "@/lib/supabase";
 import { MESES } from "@/lib/types";
 import { CreateCalendarioDialog } from "@/components/CreateCalendarioDialog";
-import { toast } from "sonner";
-
-interface Row {
-  id: string;
-  nome: string;
-  mes: number;
-  ano: number;
-  cliente?: { nome: string };
-  progress?: number;
-}
+import { useCalendarios } from "@/hooks/useCalendarios";
 
 const Dashboard = () => {
-  const [rows, setRows] = useState<Row[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { useCalendariosList } = useCalendarios();
+  const { data: rows = [], isLoading, refetch } = useCalendariosList();
   const [open, setOpen] = useState(false);
-
-  const load = async () => {
-    setLoading(true);
-    try {
-      const cals = await fetchCalendarios();
-      // compute approval progress per calendar
-      const ids = cals.map((c: any) => c.id);
-      let progress: Record<string, number> = {};
-      if (ids.length) {
-        const { data: sem } = await supabase
-          .from("semanas")
-          .select("id, calendario_id")
-          .in("calendario_id", ids)
-          .is("deleted_at", null);
-        const semIds = sem?.map((s) => s.id) ?? [];
-        const { data: cont } = semIds.length
-          ? await supabase
-              .from("conteudos")
-              .select("status, semana_id")
-              .in("semana_id", semIds)
-              .neq("status", "draft")
-              .is("deleted_at", null)
-          : { data: [] as any[] };
-        const semToCal = new Map(sem?.map((s) => [s.id, s.calendario_id]));
-        const tally: Record<string, { tot: number; ok: number }> = {};
-        cont?.forEach((c) => {
-          const cid = semToCal.get(c.semana_id)!;
-          tally[cid] ??= { tot: 0, ok: 0 };
-          tally[cid].tot++;
-          if (c.status === "approved") tally[cid].ok++;
-        });
-        Object.entries(tally).forEach(([k, v]) => {
-          progress[k] = v.tot ? Math.round((v.ok / v.tot) * 100) : 0;
-        });
-      }
-      setRows(cals.map((c: any) => ({ ...c, progress: progress[c.id] ?? 0 })));
-    } catch (e: any) {
-      toast.error("Erro ao carregar calendários: " + e.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
 
   return (
     <AdminLayout>
@@ -85,7 +28,7 @@ const Dashboard = () => {
         </Button>
       </div>
 
-      {loading ? (
+      {isLoading ? (
         <div className="flex h-64 items-center justify-center text-muted-foreground">
           <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Carregando…
         </div>
@@ -140,7 +83,7 @@ const Dashboard = () => {
         </div>
       )}
 
-      <CreateCalendarioDialog open={open} onOpenChange={setOpen} onCreated={load} />
+      <CreateCalendarioDialog open={open} onOpenChange={setOpen} onCreated={() => refetch()} />
     </AdminLayout>
   );
 };
