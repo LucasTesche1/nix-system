@@ -48,14 +48,14 @@ const CalendarioEditor = () => {
     const ordem = (semanas[semanas.length - 1]?.ordem ?? 0) + 1;
     const { error } = await supabase
       .from("semanas")
-      .insert({ calendario_id: id, ordem, titulo: `Semana ${ordem}` });
+      .insert({ calendario_id: id, ordem, nome: `Semana ${ordem}` });
     if (error) return toast.error(error.message);
     load();
   };
 
-  const renameSemana = async (sid: string, titulo: string) => {
-    await supabase.from("semanas").update({ titulo }).eq("id", sid);
-    setSemanas((prev) => prev.map((s) => (s.id === sid ? { ...s, titulo } : s)));
+  const renameSemana = async (sid: string, nome: string) => {
+    await supabase.from("semanas").update({ nome }).eq("id", sid);
+    setSemanas((prev) => prev.map((s) => (s.id === sid ? { ...s, nome } : s)));
   };
 
   const removeSemana = async (sid: string) => {
@@ -126,8 +126,8 @@ const CalendarioEditor = () => {
             <section key={s.id} className="rounded-2xl border border-border bg-card p-6">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <Input
-                  value={s.titulo ?? ""}
-                  onChange={(e) => setSemanas((p) => p.map((x) => x.id === s.id ? { ...x, titulo: e.target.value } : x))}
+                  value={s.nome ?? ""}
+                  onChange={(e) => setSemanas((p) => p.map((x) => x.id === s.id ? { ...x, nome: e.target.value } : x))}
                   onBlur={(e) => renameSemana(s.id, e.target.value)}
                   className="max-w-xs border-0 bg-transparent px-0 text-lg font-semibold focus-visible:ring-0"
                 />
