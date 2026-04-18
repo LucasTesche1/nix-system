@@ -48,7 +48,7 @@ export interface Post {
   conteudo_id: string;
   formato: PostFormat;
   legenda: string | null;
-  link_drive: string | null;
+  drive_url: string | null;
 }
 
 export interface PostVideo {
