@@ -82,7 +82,6 @@ export interface CarrosselImagem {
 export interface Story {
   id: string;
   conteudo_id: string;
-  dia_semana: number;
   texto: string;
 }
 
