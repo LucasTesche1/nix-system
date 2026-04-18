@@ -62,6 +62,7 @@ export const CreateCalendarioDialog = ({ open, onOpenChange, onCreated }: Props)
           mes,
           ano,
           token_acesso: generateToken(),
+          status: "draft",
         })
         .select()
         .single();
