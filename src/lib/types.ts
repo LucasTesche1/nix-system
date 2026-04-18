@@ -25,7 +25,7 @@ export interface Semana {
   id: string;
   calendario_id: string;
   ordem: number;
-  titulo: string | null;
+  nome: string | null;
   deleted_at?: string | null;
 }
 
@@ -48,7 +48,7 @@ export interface Post {
   conteudo_id: string;
   formato: PostFormat;
   legenda: string | null;
-  link_drive: string | null;
+  drive_url: string | null;
 }
 
 export interface PostVideo {
@@ -82,7 +82,6 @@ export interface CarrosselImagem {
 export interface Story {
   id: string;
   conteudo_id: string;
-  dia_semana: number;
   texto: string;
 }
 

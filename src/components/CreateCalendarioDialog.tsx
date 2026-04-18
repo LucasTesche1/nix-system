@@ -72,7 +72,7 @@ export const CreateCalendarioDialog = ({ open, onOpenChange, onCreated }: Props)
         [1, 2, 3, 4].map((o) => ({
           calendario_id: cal.id,
           ordem: o,
-          titulo: `Semana ${o}`,
+          nome: `Semana ${o}`,
         }))
       );
       toast.success("Calendário criado!");

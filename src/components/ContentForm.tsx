@@ -61,7 +61,7 @@ export const ContentForm = ({ open, onOpenChange, calendario, semanaId, conteudo
       if (conteudo.tipo === "post" && conteudo.post) {
         setFormato(conteudo.post.formato);
         setLegenda(conteudo.post.legenda ?? "");
-        setLinkDrive(conteudo.post.link_drive ?? "");
+        setLinkDrive(conteudo.post.drive_url ?? "");
         if (conteudo.post.video) {
           setGancho(conteudo.post.video.gancho);
           setDesenvolvimento(conteudo.post.video.desenvolvimento);
@@ -112,6 +112,7 @@ export const ContentForm = ({ open, onOpenChange, calendario, semanaId, conteudo
       // upsert conteudo
       const conteudoPayload: any = {
         semana_id: semanaId,
+        calendario_id: calendario.id,
         tipo,
         data_publicacao: tipo === "post" ? dataPub : null,
         dia_semana: tipo === "story" ? diaSemana : null,
@@ -157,7 +158,7 @@ export const ContentForm = ({ open, onOpenChange, calendario, semanaId, conteudo
       if (tipo === "post") {
         const { data: post, error: pe } = await supabase
           .from("posts")
-          .insert({ conteudo_id: conteudoId, formato, legenda, link_drive: linkDrive })
+          .insert({ conteudo_id: conteudoId, formato, legenda, drive_url: linkDrive })
           .select().single();
         if (pe) throw pe;
         if (formato === "video") {
@@ -181,7 +182,7 @@ export const ContentForm = ({ open, onOpenChange, calendario, semanaId, conteudo
         }
       } else {
         await supabase.from("stories")
-          .insert({ conteudo_id: conteudoId, dia_semana: diaSemana, texto: storyTexto });
+          .insert({ conteudo_id: conteudoId, texto: storyTexto });
       }
       toast.success(isEdit ? "Conteúdo atualizado" : "Conteúdo criado");
       onOpenChange(false);
