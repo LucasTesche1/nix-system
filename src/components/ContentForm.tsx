@@ -23,16 +23,15 @@ interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   semanaId: string;
+  calendarioId: string;
   conteudo?: ConteudoCompleto;
   onSaved: () => void;
 }
 
-export const ContentForm = ({ open, onOpenChange, semanaId, conteudo, onSaved }: Props) => {
+export const ContentForm = ({ open, onOpenChange, semanaId, calendarioId, conteudo, onSaved }: Props) => {
   const { saveConteudo } = useConteudos();
   const { useCalendario } = useCalendarios();
-  
-  // Precisamos do calendário para validar a data
-  const [calendarioId, setCalendarioId] = useState<string>("");
+
   const { data: calendario } = useCalendario(calendarioId);
 
   const [tipo, setTipo] = useState<ContentType>("post");
@@ -123,7 +122,7 @@ export const ContentForm = ({ open, onOpenChange, semanaId, conteudo, onSaved }:
     const payload: any = {
       isEdit,
       semanaId,
-      calendarioId: conteudo?.calendario_id || "", // Precisamos garantir esse ID
+      calendarioId,
       tipo,
       status,
       data_publicacao: tipo === "post" ? dataPub : null,

@@ -189,6 +189,7 @@ const CalendarioEditor = () => {
         open={formOpen}
         onOpenChange={setFormOpen}
         semanaId={editing?.semanaId ?? ""}
+        calendarioId={id}
         conteudo={editing?.conteudo}
         onSaved={() => {}}
       />
