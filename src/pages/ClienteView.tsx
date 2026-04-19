@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -10,9 +10,18 @@ import { useCalendarios } from "@/hooks/useCalendarios";
 import { useConteudos } from "@/hooks/useConteudos";
 import { MESES, DIAS_SEMANA } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
 
 const ClienteView = () => {
   const { token = "" } = useParams<{ token: string }>();
+
+  useEffect(() => {
+    if (token) {
+      api.setClientToken(token);
+    }
+    return () => api.setClientToken(null);
+  }, [token]);
+
   const { useCalendarioByToken } = useCalendarios();
   const { useSemanas, useConteudosBySemanas, updateStatus } = useConteudos();
 
@@ -24,6 +33,11 @@ const ClienteView = () => {
   const { data: conteudos = [], isLoading: loadingConteudos } = useConteudosBySemanas(semanaIds, true);
 
   const [comments, setComments] = useState<Record<string, string>>({});
+
+  const { total, approved } = useMemo(() => ({
+    total: conteudos.length,
+    approved: conteudos.filter((c) => c.status === "approved").length
+  }), [conteudos]);
 
   const handleAct = async (id: string, status: "approved" | "rejected") => {
     const coment = comments[id] || "";
@@ -59,11 +73,6 @@ const ClienteView = () => {
       </div>
     );
   }
-
-  const { total, approved } = useMemo(() => ({
-    total: conteudos.length,
-    approved: conteudos.filter((c) => c.status === "approved").length
-  }), [conteudos]);
 
   return (
     <div className="min-h-screen bg-background bg-mesh">

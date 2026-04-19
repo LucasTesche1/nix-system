@@ -8,6 +8,7 @@ export type CalendarioComCliente = Tables<'calendarios'> & {
 
 export const CalendarioService = {
   async getAll(): Promise<CalendarioComCliente[]> {
+    api.setClientToken(null);
     const { data, error } = await api
       .from("calendarios")
       .select("*, cliente:clientes(*)")
@@ -20,6 +21,7 @@ export const CalendarioService = {
   },
 
   async getById(id: string) {
+    api.setClientToken(null);
     const { data, error } = await api
       .from("calendarios")
       .select("*, cliente:clientes(*)")
@@ -32,6 +34,7 @@ export const CalendarioService = {
   },
 
   async getByToken(token: string) {
+    api.setClientToken(token);
     const { data, error } = await api
       .from("calendarios")
       .select("*, cliente:clientes(*)")
