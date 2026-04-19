@@ -169,7 +169,7 @@ const ClienteView = () => {
                       <StatusBadge status={c.status} />
                     </div>
 
-                    <div className="space-y-4 p-5">
+                    <div className="space-y-4 p-4 sm:p-5">
                       {c.tipo === "story" && (
                         <p className="whitespace-pre-wrap text-[15px] leading-relaxed">
                           {c.story?.texto}
@@ -229,7 +229,7 @@ const ClienteView = () => {
                             />
                           </div>
                           
-                          <div className="flex gap-3">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
                             <Button
                               className="flex-1 bg-green-600 hover:bg-green-700 text-white shadow-sm"
                               onClick={() => handleAct(c.id, "approved")}
