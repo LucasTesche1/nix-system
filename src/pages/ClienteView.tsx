@@ -1,63 +1,77 @@
-import { useEffect, useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import {
-  fetchCalendarioByToken, fetchSemanas, fetchConteudosBySemanas, updateConteudoStatus,
-} from "@/lib/queries";
-import { ConteudoCompleto, MESES, DIAS_SEMANA } from "@/lib/types";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, X, Loader2, ExternalLink, Sparkles, MessageCircle } from "lucide-react";
+import { Check, X, Loader2, Sparkles, MessageCircle } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { CalendarioService } from "@/services/calendario.service";
+import { ConteudoService } from "@/services/conteudo.service";
+import { Tables } from "@/integrations/supabase/types";
 import { toast } from "sonner";
+import { MESES, DIAS_SEMANA } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
 
 const ClienteView = () => {
-  const { token } = useParams<{ token: string }>();
-  const [cal, setCal] = useState<any>(null);
-  const [semanas, setSemanas] = useState<any[]>([]);
-  const [conteudos, setConteudos] = useState<ConteudoCompleto[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [commentingId, setCommentingId] = useState<string | null>(null);
-  const [comment, setComment] = useState("");
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const { token = "" } = useParams<{ token: string }>();
+  const queryClient = useQueryClient();
 
-  const load = async () => {
-    if (!token) return;
-    setLoading(true);
-    try {
-      const c = await fetchCalendarioByToken(token);
-      setCal(c);
-      const s = await fetchSemanas(c.id);
-      setSemanas(s);
-      const cont = await fetchConteudosBySemanas(s.map((x) => x.id), true);
-      setConteudos(cont);
-    } catch (e: any) {
-      setError("Calendário não encontrado ou link inválido.");
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (token) {
+      api.setClientToken(token);
     }
+    return () => api.setClientToken(null);
+  }, [token]);
+
+  const { data: cal, isLoading: loadingCal, error: calError } = useQuery({
+    queryKey: ["calendario-token", token],
+    queryFn: () => CalendarioService.getByToken(token),
+    enabled: !!token,
+  });
+
+  const { data: semanas = [], isLoading: loadingSemanas } = useQuery({
+    queryKey: ["semanas", cal?.id ?? ""],
+    queryFn: () => ConteudoService.getSemanas(cal!.id),
+    enabled: !!cal?.id,
+  });
+
+  const semanaIds = useMemo(() => semanas.map((s) => s.id), [semanas]);
+
+  const { data: conteudos = [], isLoading: loadingConteudos } = useQuery({
+    queryKey: ["conteudos", semanaIds, true],
+    queryFn: () => ConteudoService.getConteudosBySemanas(semanaIds, true),
+    enabled: !!semanaIds.length,
+  });
+
+  const updateStatus = useMutation({
+    mutationFn: ({ id, status, comentario }: { id: string; status: Tables<'conteudos'>['status']; comentario?: string }) =>
+      ConteudoService.updateStatus(id, status, comentario),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["conteudos"] });
+      toast.success("Status atualizado com sucesso");
+    },
+    onError: (error: Error) => {
+      toast.error("Erro ao atualizar status: " + error.message);
+    },
+  });
+
+  const [comments, setComments] = useState<Record<string, string>>({});
+
+  const { total, approved } = useMemo(() => ({
+    total: conteudos.length,
+    approved: conteudos.filter((c) => c.status === "approved").length
+  }), [conteudos]);
+
+  const handleAct = async (id: string, status: "approved" | "rejected") => {
+    const coment = comments[id] || "";
+    updateStatus.mutate({ id, status, comentario: coment });
+    // Limpar comentário local após sucesso se desejar, mas o mutate já vai invalidar a query
   };
 
-  useEffect(() => { load(); }, [token]);
-
-  const act = async (id: string, status: "approved" | "rejected", coment?: string) => {
-    setBusyId(id);
-    try {
-      await updateConteudoStatus(id, status, coment);
-      setConteudos((p) => p.map((c) => c.id === id ? { ...c, status, comentario_cliente: coment ?? c.comentario_cliente } : c));
-      setCommentingId(null);
-      setComment("");
-      toast.success(status === "approved" ? "Aprovado!" : "Reprovado");
-    } catch (e: any) {
-      toast.error(e.message);
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  if (loading) {
+  if (loadingCal || loadingSemanas || loadingConteudos) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background bg-mesh">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -65,40 +79,46 @@ const ClienteView = () => {
     );
   }
 
-  if (error) {
+  if (calError || !cal) {
+    const errorMsg = calError instanceof Error ? calError.message : "Link inválido";
+    const subMsg = errorMsg === "Link expirado" 
+      ? "Este link de visualização expirou. Solicite um novo link."
+      : errorMsg === "Calendário ainda não está ativo"
+      ? "Este calendário está sendo preparado e ainda não foi liberado para visualização."
+      : "Calendário não encontrado ou link inválido.";
+
     return (
       <div className="flex min-h-screen items-center justify-center bg-background bg-mesh">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold">Link inválido</h1>
-          <p className="mt-2 text-muted-foreground">{error}</p>
+        <div className="text-center px-6">
+          <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-secondary/50">
+            <X className="h-10 w-10 text-muted-foreground" />
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight">{errorMsg}</h1>
+          <p className="mt-3 text-lg text-muted-foreground max-w-sm mx-auto">{subMsg}</p>
         </div>
       </div>
     );
   }
 
-  const total = conteudos.length;
-  const approved = conteudos.filter((c) => c.status === "approved").length;
-
   return (
     <div className="min-h-screen bg-background bg-mesh">
-      {/* Header */}
       <header className="border-b border-border/60 bg-background/80 backdrop-blur-xl">
-        <div className="mx-auto max-w-3xl px-6 py-8">
-          <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-widest text-muted-foreground">
+        <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
+          <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-widest text-muted-foreground sm:text-xs">
             <Sparkles className="h-3.5 w-3.5" />
             Calendário de conteúdo
           </div>
-          <h1 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">
+          <h1 className="mt-3 break-words text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl">
             {cal.nome}
           </h1>
-          <p className="mt-1 text-muted-foreground">
+          <p className="mt-1 text-sm text-muted-foreground sm:text-base">
             {cal.cliente?.nome} · {MESES[cal.mes - 1]} de {cal.ano}
           </p>
 
-          <div className="mt-6 rounded-2xl border border-border bg-card p-4">
-            <div className="mb-2 flex items-baseline justify-between">
-              <div className="text-sm text-muted-foreground">Progresso de aprovação</div>
-              <div className="text-lg font-bold">
+          <div className="mt-5 rounded-2xl border border-border bg-card p-4 sm:mt-6">
+            <div className="mb-2 flex items-baseline justify-between gap-3">
+              <div className="text-xs text-muted-foreground sm:text-sm">Progresso de aprovação</div>
+              <div className="text-base font-bold sm:text-lg">
                 <span className="text-gradient">{approved}</span>
                 <span className="text-muted-foreground"> de {total}</span>
               </div>
@@ -113,16 +133,16 @@ const ClienteView = () => {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-6 py-10">
+      <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-10">
         {semanas.map((s) => {
           const items = conteudos.filter((c) => c.semana_id === s.id);
           if (!items.length) return null;
           return (
-            <section key={s.id} className="mb-12">
+            <section key={s.id} className="mb-10 sm:mb-12">
               <div className="mb-5 flex items-center gap-3">
                 <div className="h-px flex-1 bg-gradient-primary opacity-30" />
-                <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                  {s.titulo ?? `Semana ${s.ordem}`}
+                <h2 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground sm:text-xs">
+                  {s.nome ?? `Semana ${s.ordem}`}
                 </h2>
                 <div className="h-px flex-1 bg-gradient-primary opacity-30" />
               </div>
@@ -133,12 +153,12 @@ const ClienteView = () => {
                     key={c.id}
                     className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition hover:shadow-md"
                   >
-                    <div className="flex items-center justify-between border-b border-border/60 bg-secondary/30 px-5 py-3">
-                      <div className="flex items-center gap-2.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 bg-secondary/30 px-4 py-3 sm:px-5">
+                      <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
                         <span className="rounded-md bg-background px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                          {c.tipo === "post" ? c.post?.formato : "Story"}
+                          {c.tipo === "post" ? (c.post as any)?.formato : "Story"}
                         </span>
-                        <span className="text-sm font-medium">
+                        <span className="truncate text-xs font-medium sm:text-sm">
                           {c.tipo === "post" && c.data_publicacao
                             ? format(parseISO(c.data_publicacao), "EEEE, dd 'de' MMM", { locale: ptBR })
                             : c.tipo === "story" && c.dia_semana !== null
@@ -149,36 +169,36 @@ const ClienteView = () => {
                       <StatusBadge status={c.status} />
                     </div>
 
-                    <div className="space-y-4 p-5">
+                    <div className="space-y-4 p-4 sm:p-5">
                       {c.tipo === "story" && (
                         <p className="whitespace-pre-wrap text-[15px] leading-relaxed">
                           {c.story?.texto}
                         </p>
                       )}
 
-                      {c.tipo === "post" && c.post?.formato === "video" && c.post.video && (
+                      {c.tipo === "post" && (c.post as any)?.formato === "video" && (c.post as any).video && (
                         <div className="space-y-3">
-                          <Field label="Gancho" value={c.post.video.gancho} />
-                          <Field label="Desenvolvimento" value={c.post.video.desenvolvimento} />
-                          <Field label="CTA" value={c.post.video.cta} />
+                          <Field label="Gancho" value={(c.post as any).video.gancho} />
+                          <Field label="Desenvolvimento" value={(c.post as any).video.desenvolvimento} />
+                          <Field label="CTA" value={(c.post as any).video.cta} />
                         </div>
                       )}
 
-                      {c.tipo === "post" && c.post?.formato === "estatico" && c.post.estatico && (
+                      {c.tipo === "post" && (c.post as any)?.formato === "estatico" && (c.post as any).estatico && (
                         <div className="space-y-3">
-                          <Field label="Ideia" value={c.post.estatico.ideia} />
-                          {c.post.estatico.imagem_url && (
-                            <img src={c.post.estatico.imagem_url} alt="" className="w-full rounded-lg border border-border" />
+                          <Field label="Ideia" value={(c.post as any).estatico.ideia} />
+                          {(c.post as any).estatico.imagem_url && (
+                            <img src={(c.post as any).estatico.imagem_url} alt="" className="w-full rounded-lg border border-border" />
                           )}
                         </div>
                       )}
 
-                      {c.tipo === "post" && c.post?.formato === "carrossel" && c.post.carrossel && (
+                      {c.tipo === "post" && (c.post as any)?.formato === "carrossel" && (c.post as any).carrossel && (
                         <div className="space-y-3">
-                          <Field label="Ideia" value={c.post.carrossel.ideia} />
-                          {c.post.carrossel.imagens.length > 0 && (
+                          <Field label="Ideia" value={(c.post as any).carrossel.ideia} />
+                          {(c.post as any).carrossel.imagens.length > 0 && (
                             <div className="flex gap-2 overflow-x-auto pb-2">
-                              {c.post.carrossel.imagens.map((im) => (
+                              {(c.post as any).carrossel.imagens.map((im: any) => (
                                 <img
                                   key={im.id}
                                   src={im.imagem_url}
@@ -191,92 +211,67 @@ const ClienteView = () => {
                         </div>
                       )}
 
-                      {c.tipo === "post" && c.post?.legenda && (
-                        <Field label="Legenda" value={c.post.legenda} />
+                      {(c.post as any)?.legenda && (
+                        <Field label="Legenda" value={(c.post as any).legenda} />
                       )}
 
-                      {c.tipo === "post" && c.post?.drive_url && (
-                        <a
-                          href={c.post.drive_url}
-                          target="_blank" rel="noreferrer"
-                          className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5" /> Abrir material
-                        </a>
+                      {c.status === "pending_review" && (
+                        <div className="mt-8 space-y-4 border-t border-border/60 pt-6">
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground/80">
+                              Feedback (Opcional)
+                            </label>
+                            <Textarea
+                              placeholder="Deixe um comentário para a equipe (opcional)"
+                              value={comments[c.id] ?? ""}
+                              onChange={(e) => setComments(p => ({ ...p, [c.id]: e.target.value }))}
+                              className="min-h-[80px] rounded-xl bg-secondary/20 focus:bg-background transition-colors"
+                            />
+                          </div>
+                          
+                          <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
+                            <Button
+                              className="flex-1 bg-green-600 hover:bg-green-700 text-white shadow-sm"
+                              onClick={() => handleAct(c.id, "approved")}
+                              disabled={updateStatus.isPending}
+                            >
+                              {updateStatus.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
+                              Aprovar
+                            </Button>
+                            <Button
+                              variant="outline"
+                              className="flex-1 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                              onClick={() => handleAct(c.id, "rejected")}
+                              disabled={updateStatus.isPending}
+                            >
+                              {updateStatus.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <X className="mr-2 h-4 w-4" />}
+                              Solicitar ajustes
+                            </Button>
+                          </div>
+                        </div>
                       )}
 
-                      {c.comentario_cliente && (
-                        <div className="rounded-lg border border-border bg-secondary/40 p-3 text-sm">
-                          <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-                            <MessageCircle className="h-3 w-3" /> Seu comentário
+                      {c.comentario_cliente && c.status !== "pending_review" && (
+                        <div className={cn(
+                          "mt-4 rounded-xl p-4 text-sm border transition-colors",
+                          c.status === "rejected" 
+                            ? "bg-red-50 text-red-800 border-red-100" 
+                            : "bg-emerald-50 text-emerald-800 border-emerald-100"
+                        )}>
+                          <div className="flex items-center gap-2 font-bold mb-1">
+                            <MessageCircle className="h-3.5 w-3.5" /> 
+                            {c.status === "rejected" ? "Ajustes solicitados" : "Comentário da aprovação"}
                           </div>
                           {c.comentario_cliente}
                         </div>
                       )}
                     </div>
-
-                    {c.status === "pending_review" && (
-                      <div className="border-t border-border/60 bg-background p-4">
-                        {commentingId === c.id ? (
-                          <div className="space-y-2">
-                            <Textarea
-                              value={comment}
-                              onChange={(e) => setComment(e.target.value)}
-                              placeholder="Comentário (opcional)…"
-                              rows={2}
-                            />
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm" variant="outline"
-                                onClick={() => { setCommentingId(null); setComment(""); }}
-                                className="flex-1"
-                              >Cancelar</Button>
-                              <Button
-                                size="sm" onClick={() => act(c.id, "rejected", comment)}
-                                disabled={busyId === c.id}
-                                className="flex-1 bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              >Reprovar</Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm" variant="outline"
-                              onClick={() => setCommentingId(c.id)}
-                              disabled={busyId === c.id}
-                              className="flex-1"
-                            >
-                              <X className="mr-1.5 h-3.5 w-3.5" /> Reprovar
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => act(c.id, "approved")}
-                              disabled={busyId === c.id}
-                              className="flex-1 bg-gradient-primary text-primary-foreground"
-                            >
-                              {busyId === c.id ? (
-                                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                <Check className="mr-1.5 h-3.5 w-3.5" />
-                              )}
-                              Aprovar
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </article>
                 ))}
               </div>
             </section>
           );
         })}
-
-        {conteudos.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-border bg-card/40 p-12 text-center">
-            <p className="text-muted-foreground">Nenhum conteúdo disponível para revisão ainda.</p>
-          </div>
-        )}
       </main>
     </div>
   );
@@ -284,9 +279,12 @@ const ClienteView = () => {
 
 const Field = ({ label, value }: { label: string; value: string }) => (
   <div>
-    <div className="mb-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{label}</div>
-    <p className="whitespace-pre-wrap text-[15px] leading-relaxed">{value}</p>
+    <div className="mb-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80">
+      {label}
+    </div>
+    <div className="text-[15px] leading-relaxed">{value}</div>
   </div>
 );
 
 export default ClienteView;
+

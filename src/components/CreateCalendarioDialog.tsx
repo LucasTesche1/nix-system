@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -7,11 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { supabase } from "@/lib/supabase";
 import { MESES } from "@/lib/types";
 import { generateToken } from "@/lib/status";
 import { toast } from "sonner";
 import { Loader2, Plus } from "lucide-react";
+import { useCalendarios } from "@/hooks/useCalendarios";
 
 interface Props {
   open: boolean;
@@ -21,69 +21,33 @@ interface Props {
 
 export const CreateCalendarioDialog = ({ open, onOpenChange, onCreated }: Props) => {
   const navigate = useNavigate();
+  const { useClientes, createCalendario } = useCalendarios();
+  const { data: clientes = [] } = useClientes();
+
   const [nome, setNome] = useState("");
   const [clienteId, setClienteId] = useState<string>("");
   const [novoCliente, setNovoCliente] = useState("");
   const [mes, setMes] = useState(new Date().getMonth() + 1);
   const [ano, setAno] = useState(new Date().getFullYear());
-  const [clientes, setClientes] = useState<{ id: string; nome: string }[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    supabase
-      .from("clientes")
-      .select("id, nome")
-      .is("deleted_at", null)
-      .order("nome")
-      .then(({ data }) => setClientes(data ?? []));
-  }, [open]);
 
   const submit = async () => {
     if (!nome.trim()) return toast.error("Informe o nome do calendário");
     if (!clienteId && !novoCliente.trim()) return toast.error("Selecione ou crie um cliente");
-    setLoading(true);
-    try {
-      let cid = clienteId;
-      if (!cid) {
-        const { data, error } = await supabase
-          .from("clientes")
-          .insert({ nome: novoCliente.trim() })
-          .select()
-          .single();
-        if (error) throw error;
-        cid = data.id;
+    
+    createCalendario.mutate({
+      nome,
+      clienteId,
+      novoCliente,
+      mes,
+      ano,
+      token: generateToken(),
+    }, {
+      onSuccess: (cal) => {
+        onOpenChange(false);
+        onCreated?.();
+        navigate(`/calendario/${cal.id}`);
       }
-      const { data: cal, error } = await supabase
-        .from("calendarios")
-        .insert({
-          cliente_id: cid,
-          nome: nome.trim(),
-          mes,
-          ano,
-          token_acesso: generateToken(),
-          status: "draft",
-        })
-        .select()
-        .single();
-      if (error) throw error;
-      // create 4 default semanas
-      await supabase.from("semanas").insert(
-        [1, 2, 3, 4].map((o) => ({
-          calendario_id: cal.id,
-          ordem: o,
-          nome: `Semana ${o}`,
-        }))
-      );
-      toast.success("Calendário criado!");
-      onOpenChange(false);
-      onCreated?.();
-      navigate(`/calendario/${cal.id}`);
-    } catch (e: any) {
-      toast.error(e.message);
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   const anos = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 1 + i);
@@ -155,8 +119,8 @@ export const CreateCalendarioDialog = ({ open, onOpenChange, onCreated }: Props)
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={submit} disabled={loading} className="bg-gradient-primary">
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          <Button onClick={submit} disabled={createCalendario.isPending} className="bg-gradient-primary">
+            {createCalendario.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Criar
           </Button>
         </DialogFooter>

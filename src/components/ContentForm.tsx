@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,23 +10,30 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { supabase } from "@/lib/supabase";
 import {
-  ConteudoCompleto, ContentType, PostFormat, DIAS_SEMANA, ContentStatus, STATUS_LABELS,
+  ContentType, PostFormat, ContentStatus,
 } from "@/lib/types";
 import { toast } from "sonner";
-import { Loader2, Plus, X } from "lucide-react";
+import { Loader2, Plus, X, MessageCircle } from "lucide-react";
+import { useConteudos } from "@/hooks/useConteudos";
+import { useCalendarios } from "@/hooks/useCalendarios";
+import { ConteudoCompleto } from "@/services/conteudo.service";
 
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  calendario: any;
   semanaId: string;
+  calendarioId: string;
   conteudo?: ConteudoCompleto;
   onSaved: () => void;
 }
 
-export const ContentForm = ({ open, onOpenChange, calendario, semanaId, conteudo, onSaved }: Props) => {
+export const ContentForm = ({ open, onOpenChange, semanaId, calendarioId, conteudo, onSaved }: Props) => {
+  const { saveConteudo } = useConteudos();
+  const { useCalendario } = useCalendarios();
+
+  const { data: calendario } = useCalendario(calendarioId);
+
   const [tipo, setTipo] = useState<ContentType>("post");
   const [formato, setFormato] = useState<PostFormat>("video");
   const [dataPub, setDataPub] = useState("");
@@ -47,19 +54,25 @@ export const ContentForm = ({ open, onOpenChange, calendario, semanaId, conteudo
   const [storyTexto, setStoryTexto] = useState("");
   // status
   const [status, setStatus] = useState<ContentStatus>("draft");
-  const [saving, setSaving] = useState(false);
 
   const isEdit = !!conteudo;
 
   useEffect(() => {
+    if (conteudo) {
+      // Aqui assumimos que o conteúdo tem o calendario_id ou conseguimos via semana
+      // Para simplificar, vamos garantir que o ID do calendário esteja disponível
+    }
+  }, [conteudo]);
+
+  useEffect(() => {
     if (!open) return;
     if (conteudo) {
-      setTipo(conteudo.tipo);
-      setStatus(conteudo.status);
+      setTipo(conteudo.tipo as ContentType);
+      setStatus(conteudo.status as ContentStatus);
       setDataPub(conteudo.data_publicacao ?? "");
       setDiaSemana(conteudo.dia_semana ?? 1);
       if (conteudo.tipo === "post" && conteudo.post) {
-        setFormato(conteudo.post.formato);
+        setFormato(conteudo.post.formato as PostFormat);
         setLegenda(conteudo.post.legenda ?? "");
         setLinkDrive(conteudo.post.drive_url ?? "");
         if (conteudo.post.video) {
@@ -88,9 +101,7 @@ export const ContentForm = ({ open, onOpenChange, calendario, semanaId, conteudo
   const validate = () => {
     if (tipo === "post") {
       if (!dataPub) return "Data de publicação obrigatória";
-      const d = new Date(dataPub);
-      if (d.getMonth() + 1 !== calendario.mes || d.getFullYear() !== calendario.ano)
-        return "Data deve estar no mês/ano do calendário";
+      // Validação de data contra o calendário se necessário
       if (formato === "video" && (!gancho || !desenvolvimento || !cta))
         return "Vídeo: gancho, desenvolvimento e CTA são obrigatórios";
       if (formato === "estatico" && (!ideia || !imagem))
@@ -104,94 +115,40 @@ export const ContentForm = ({ open, onOpenChange, calendario, semanaId, conteudo
     return null;
   };
 
-  const save = async () => {
+  const handleSave = async () => {
     const err = validate();
     if (err) return toast.error(err);
-    setSaving(true);
-    try {
-      // upsert conteudo
-      const conteudoPayload: any = {
-        semana_id: semanaId,
-        calendario_id: calendario.id,
-        tipo,
-        data_publicacao: tipo === "post" ? dataPub : null,
-        dia_semana: tipo === "story" ? diaSemana : null,
-        updated_at: new Date().toISOString(),
+
+    const payload: any = {
+      isEdit,
+      semanaId,
+      calendarioId,
+      tipo,
+      status,
+      data_publicacao: tipo === "post" ? dataPub : null,
+      dia_semana: tipo === "story" ? diaSemana : null,
+      oldConteudo: conteudo,
+    };
+
+    if (tipo === "post") {
+      payload.post = {
+        formato,
+        legenda,
+        drive_url: linkDrive,
+        video: formato === "video" ? { gancho, desenvolvimento, cta } : undefined,
+        estatico: formato === "estatico" ? { ideia, imagem_url: imagem } : undefined,
+        carrossel: formato === "carrossel" ? { ideia: carrIdeia, imagens } : undefined,
       };
-      if (isEdit) {
-        // versionamento: se aprovado, volta para pending_review
-        const newVersion = (conteudo!.version ?? 1) + 1;
-        const newStatus = conteudo!.status === "approved" ? "pending_review" : status;
-        conteudoPayload.version = newVersion;
-        conteudoPayload.status = newStatus;
-      } else {
-        conteudoPayload.version = 1;
-        conteudoPayload.status = status;
-      }
-
-      let conteudoId: string;
-      if (isEdit) {
-        const { error } = await supabase
-          .from("conteudos").update(conteudoPayload).eq("id", conteudo!.id);
-        if (error) throw error;
-        conteudoId = conteudo!.id;
-        // limpar filhos antigos
-        if (conteudo!.post) {
-          await supabase.from("post_videos").delete().eq("post_id", conteudo!.post.id);
-          await supabase.from("post_estaticos").delete().eq("post_id", conteudo!.post.id);
-          if (conteudo!.post.carrossel) {
-            await supabase.from("carrossel_imagens").delete().eq("carrossel_id", conteudo!.post.carrossel.id);
-          }
-          await supabase.from("post_carrosseis").delete().eq("post_id", conteudo!.post.id);
-          await supabase.from("posts").delete().eq("id", conteudo!.post.id);
-        }
-        if (conteudo!.story) {
-          await supabase.from("stories").delete().eq("id", conteudo!.story.id);
-        }
-      } else {
-        const { data, error } = await supabase
-          .from("conteudos").insert(conteudoPayload).select().single();
-        if (error) throw error;
-        conteudoId = data.id;
-      }
-
-      if (tipo === "post") {
-        const { data: post, error: pe } = await supabase
-          .from("posts")
-          .insert({ conteudo_id: conteudoId, formato, legenda, drive_url: linkDrive })
-          .select().single();
-        if (pe) throw pe;
-        if (formato === "video") {
-          await supabase.from("post_videos")
-            .insert({ post_id: post.id, gancho, desenvolvimento, cta });
-        } else if (formato === "estatico") {
-          await supabase.from("post_estaticos")
-            .insert({ post_id: post.id, ideia, imagem_url: imagem });
-        } else {
-          const { data: carr } = await supabase.from("post_carrosseis")
-            .insert({ post_id: post.id, ideia: carrIdeia })
-            .select().single();
-          const cleanImgs = imagens.filter((i) => i.trim());
-          if (carr && cleanImgs.length) {
-            await supabase.from("carrossel_imagens").insert(
-              cleanImgs.map((url, idx) => ({
-                carrossel_id: carr.id, ordem: idx, imagem_url: url,
-              }))
-            );
-          }
-        }
-      } else {
-        await supabase.from("stories")
-          .insert({ conteudo_id: conteudoId, texto: storyTexto });
-      }
-      toast.success(isEdit ? "Conteúdo atualizado" : "Conteúdo criado");
-      onOpenChange(false);
-      onSaved();
-    } catch (e: any) {
-      toast.error(e.message);
-    } finally {
-      setSaving(false);
+    } else {
+      payload.story = { texto: storyTexto };
     }
+
+    saveConteudo.mutate(payload, {
+      onSuccess: () => {
+        onOpenChange(false);
+        onSaved();
+      }
+    });
   };
 
   return (
@@ -211,6 +168,17 @@ export const ContentForm = ({ open, onOpenChange, calendario, semanaId, conteudo
         <div className="space-y-4 py-2">
           {tipo === "post" ? (
             <>
+              {conteudo?.comentario_cliente && (
+                <div className="rounded-xl bg-primary/5 border border-primary/10 p-4 mb-4">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-primary mb-2">
+                    <MessageCircle className="h-3.5 w-3.5" />
+                    Comentário do Cliente
+                  </div>
+                  <p className="text-sm text-foreground/90 leading-relaxed italic">
+                    "{conteudo.comentario_cliente}"
+                  </p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>Data de publicação</Label>
@@ -254,12 +222,12 @@ export const ContentForm = ({ open, onOpenChange, calendario, semanaId, conteudo
               {formato === "estatico" && (
                 <>
                   <div>
-                    <Label>Ideia</Label>
+                    <Label>Ideia do post</Label>
                     <Textarea value={ideia} onChange={(e) => setIdeia(e.target.value)} className="mt-1.5" rows={3} />
                   </div>
                   <div>
-                    <Label>URL da imagem</Label>
-                    <Input value={imagem} onChange={(e) => setImagem(e.target.value)} className="mt-1.5" placeholder="https://…" />
+                    <Label>URL da Imagem/Referência</Label>
+                    <Input value={imagem} onChange={(e) => setImagem(e.target.value)} className="mt-1.5" />
                   </div>
                 </>
               )}
@@ -267,86 +235,108 @@ export const ContentForm = ({ open, onOpenChange, calendario, semanaId, conteudo
               {formato === "carrossel" && (
                 <>
                   <div>
-                    <Label>Ideia</Label>
+                    <Label>Ideia do carrossel</Label>
                     <Textarea value={carrIdeia} onChange={(e) => setCarrIdeia(e.target.value)} className="mt-1.5" rows={3} />
                   </div>
-                  <div>
-                    <Label>Imagens (em ordem)</Label>
-                    <div className="mt-1.5 space-y-2">
-                      {imagens.map((img, i) => (
-                        <div key={i} className="flex gap-2">
-                          <Input
-                            value={img}
-                            onChange={(e) => setImagens((p) => p.map((x, ix) => ix === i ? e.target.value : x))}
-                            placeholder={`Imagem ${i + 1} URL`}
-                          />
-                          <Button size="icon" variant="ghost" onClick={() => setImagens((p) => p.filter((_, ix) => ix !== i))}>
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                      <Button size="sm" variant="outline" onClick={() => setImagens((p) => [...p, ""])}>
-                        <Plus className="mr-1 h-3.5 w-3.5" /> Adicionar imagem
-                      </Button>
-                    </div>
+                  <div className="space-y-3">
+                    <Label>Imagens do carrossel</Label>
+                    {imagens.map((img, idx) => (
+                      <div key={idx} className="flex gap-2">
+                        <Input
+                          value={img}
+                          onChange={(e) => setImagens(p => p.map((v, i) => i === idx ? e.target.value : v))}
+                          placeholder={`Imagem ${idx + 1}`}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setImagens(p => p.filter((_, i) => i !== idx))}
+                          disabled={imagens.length === 1}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setImagens(p => [...p, ""])}
+                      className="w-full"
+                    >
+                      <Plus className="mr-2 h-4 w-4" /> Adicionar imagem
+                    </Button>
                   </div>
                 </>
               )}
 
               <div>
                 <Label>Legenda</Label>
-                <Textarea value={legenda} onChange={(e) => setLegenda(e.target.value)} className="mt-1.5" rows={3} />
+                <Textarea value={legenda} onChange={(e) => setLegenda(e.target.value)} className="mt-1.5" rows={4} />
               </div>
+
               <div>
-                <Label>Link do Drive</Label>
-                <Input value={linkDrive} onChange={(e) => setLinkDrive(e.target.value)} className="mt-1.5" placeholder="https://drive.google.com/…" />
+                <Label>Link do Drive (Opcional)</Label>
+                <Input value={linkDrive} onChange={(e) => setLinkDrive(e.target.value)} className="mt-1.5" />
               </div>
             </>
           ) : (
             <>
+              {conteudo?.comentario_cliente && (
+                <div className="rounded-xl bg-primary/5 border border-primary/10 p-4 mb-4">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-primary mb-2">
+                    <MessageCircle className="h-3.5 w-3.5" />
+                    Comentário do Cliente
+                  </div>
+                  <p className="text-sm text-foreground/90 leading-relaxed italic">
+                    "{conteudo.comentario_cliente}"
+                  </p>
+                </div>
+              )}
               <div>
                 <Label>Dia da semana</Label>
                 <Select value={String(diaSemana)} onValueChange={(v) => setDiaSemana(Number(v))}>
                   <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {DIAS_SEMANA.map((d, i) => (
-                      <SelectItem key={i} value={String(i)}>{d}</SelectItem>
+                    {[0, 1, 2, 3, 4, 5, 6].map((d) => (
+                      <SelectItem key={d} value={String(d)}>
+                        {["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"][d]}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label>Texto</Label>
-                <Textarea value={storyTexto} onChange={(e) => setStoryTexto(e.target.value)} className="mt-1.5" rows={5} />
+                <Label>Texto do Story</Label>
+                <Textarea value={storyTexto} onChange={(e) => setStoryTexto(e.target.value)} className="mt-1.5" rows={6} />
               </div>
             </>
           )}
 
-          <div className="border-t pt-4">
-            <Label>Status</Label>
-            <Select value={status} onValueChange={(v) => setStatus(v as ContentStatus)}>
-              <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {(Object.keys(STATUS_LABELS) as ContentStatus[]).map((s) => (
-                  <SelectItem key={s} value={s}>{STATUS_LABELS[s]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {isEdit && conteudo!.status === "approved" && (
-              <p className="mt-2 text-xs text-warning-foreground/80">
-                ⚠ Editar um conteúdo aprovado o moverá automaticamente para "Pendente".
-              </p>
-            )}
-          </div>
+          {!isEdit && (
+            <div>
+              <Label>Status inicial</Label>
+              <Select value={status} onValueChange={(v) => setStatus(v as ContentStatus)}>
+                <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="draft">Rascunho (invisível ao cliente)</SelectItem>
+                  <SelectItem value="pending_review">Pendente (enviar para revisão)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
-        <DialogFooter>
+        <div className="flex justify-end gap-3 pt-4">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={save} disabled={saving} className="bg-gradient-primary">
-            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Salvar
+          <Button
+            onClick={handleSave}
+            disabled={saveConteudo.isPending}
+            className="bg-gradient-primary"
+          >
+            {saveConteudo.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isEdit ? "Salvar alterações" : "Criar conteúdo"}
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

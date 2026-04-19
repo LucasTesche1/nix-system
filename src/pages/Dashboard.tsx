@@ -1,91 +1,43 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Calendar as CalIcon, ArrowRight, Loader2 } from "lucide-react";
+import { Plus, Calendar as CalIcon, ArrowRight, Loader2, Calendar, ShieldCheck, Trash2 } from "lucide-react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { Button } from "@/components/ui/button";
-import { fetchCalendarios } from "@/lib/queries";
-import { supabase } from "@/lib/supabase";
-import { MESES } from "@/lib/types";
+import { MESES, CALENDAR_STATUS_LABELS } from "@/lib/types";
 import { CreateCalendarioDialog } from "@/components/CreateCalendarioDialog";
-import { toast } from "sonner";
-
-interface Row {
-  id: string;
-  nome: string;
-  mes: number;
-  ano: number;
-  cliente?: { nome: string };
-  progress?: number;
-}
+import { useCalendarios } from "@/hooks/useCalendarios";
+import { cn } from "@/lib/utils";
 
 const Dashboard = () => {
-  const [rows, setRows] = useState<Row[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { useCalendariosList, deleteCalendario } = useCalendarios();
+  const { data: rows = [], isLoading, refetch } = useCalendariosList();
   const [open, setOpen] = useState(false);
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const cals = await fetchCalendarios();
-      // compute approval progress per calendar
-      const ids = cals.map((c: any) => c.id);
-      let progress: Record<string, number> = {};
-      if (ids.length) {
-        const { data: sem } = await supabase
-          .from("semanas")
-          .select("id, calendario_id")
-          .in("calendario_id", ids)
-          .is("deleted_at", null);
-        const semIds = sem?.map((s) => s.id) ?? [];
-        const { data: cont } = semIds.length
-          ? await supabase
-              .from("conteudos")
-              .select("status, semana_id")
-              .in("semana_id", semIds)
-              .neq("status", "draft")
-              .is("deleted_at", null)
-          : { data: [] as any[] };
-        const semToCal = new Map(sem?.map((s) => [s.id, s.calendario_id]));
-        const tally: Record<string, { tot: number; ok: number }> = {};
-        cont?.forEach((c) => {
-          const cid = semToCal.get(c.semana_id)!;
-          tally[cid] ??= { tot: 0, ok: 0 };
-          tally[cid].tot++;
-          if (c.status === "approved") tally[cid].ok++;
-        });
-        Object.entries(tally).forEach(([k, v]) => {
-          progress[k] = v.tot ? Math.round((v.ok / v.tot) * 100) : 0;
-        });
-      }
-      setRows(cals.map((c: any) => ({ ...c, progress: progress[c.id] ?? 0 })));
-    } catch (e: any) {
-      toast.error("Erro ao carregar calendários: " + e.message);
-    } finally {
-      setLoading(false);
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (confirm("Tem certeza que deseja excluir este calendário? Esta ação não pode ser desfeita.")) {
+      deleteCalendario.mutate(id);
     }
   };
 
-  useEffect(() => {
-    load();
-  }, []);
-
   return (
     <AdminLayout>
-      <div className="mb-10 flex items-end justify-between">
+      <div className="mb-8 flex flex-col items-start justify-between gap-4 md:mb-10 md:flex-row md:items-end">
         <div>
-          <h1 className="text-4xl font-bold tracking-tight">
+          <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
             Seus <span className="text-gradient">calendários</span>
           </h1>
-          <p className="mt-2 text-muted-foreground">
+          <p className="mt-2 text-sm text-muted-foreground md:text-base">
             Crie, gerencie e compartilhe calendários de conteúdo com seus clientes.
           </p>
         </div>
-        <Button onClick={() => setOpen(true)} className="bg-gradient-primary shadow-glow hover:opacity-90">
+        <Button onClick={() => setOpen(true)} className="w-full bg-gradient-primary shadow-glow hover:opacity-90 md:w-auto">
           <Plus className="mr-2 h-4 w-4" /> Criar calendário
         </Button>
       </div>
 
-      {loading ? (
+      {isLoading ? (
         <div className="flex h-64 items-center justify-center text-muted-foreground">
           <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Carregando…
         </div>
@@ -103,7 +55,7 @@ const Dashboard = () => {
           </Button>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {rows.map((r) => (
             <Link
               key={r.id}
@@ -112,8 +64,17 @@ const Dashboard = () => {
             >
               <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-gradient-primary opacity-10 blur-2xl transition group-hover:opacity-20" />
               <div className="relative">
-                <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  {r.cliente?.nome ?? "—"}
+                <div className="flex items-start justify-between">
+                  <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    {r.cliente?.nome ?? "—"}
+                  </div>
+                  <div className={cn(
+                    "flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider",
+                    r.status === 'active' ? "bg-emerald-500/10 text-emerald-500" : "bg-orange-500/10 text-orange-500"
+                  )}>
+                    {r.status === 'active' ? <ShieldCheck className="h-3 w-3" /> : <Calendar className="h-3 w-3" />}
+                    {CALENDAR_STATUS_LABELS[r.status as keyof typeof CALENDAR_STATUS_LABELS] || r.status}
+                  </div>
                 </div>
                 <h3 className="mt-2 text-xl font-bold tracking-tight">{r.nome}</h3>
                 <div className="mt-1 text-sm text-muted-foreground">
@@ -131,8 +92,23 @@ const Dashboard = () => {
                     />
                   </div>
                 </div>
-                <div className="mt-5 flex items-center text-sm font-medium text-primary">
-                  Abrir <ArrowRight className="ml-1 h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
+                <div className="mt-5 flex items-center justify-between text-sm font-medium">
+                  <span className="flex items-center text-primary">
+                    Abrir <ArrowRight className="ml-1 h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    onClick={(e) => handleDelete(e, r.id)}
+                    disabled={deleteCalendario.isPending}
+                  >
+                    {deleteCalendario.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </Button>
                 </div>
               </div>
             </Link>
@@ -140,7 +116,7 @@ const Dashboard = () => {
         </div>
       )}
 
-      <CreateCalendarioDialog open={open} onOpenChange={setOpen} onCreated={load} />
+      <CreateCalendarioDialog open={open} onOpenChange={setOpen} onCreated={() => refetch()} />
     </AdminLayout>
   );
 };
