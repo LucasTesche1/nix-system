@@ -6,14 +6,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { Check, X, Loader2, Sparkles, MessageCircle } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { useCalendarios } from "@/hooks/useCalendarios";
-import { useConteudos } from "@/hooks/useConteudos";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { CalendarioService } from "@/services/calendario.service";
+import { ConteudoService } from "@/services/conteudo.service";
+import { Tables } from "@/integrations/supabase/types";
+import { toast } from "sonner";
 import { MESES, DIAS_SEMANA } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 
 const ClienteView = () => {
   const { token = "" } = useParams<{ token: string }>();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (token) {
@@ -22,15 +26,37 @@ const ClienteView = () => {
     return () => api.setClientToken(null);
   }, [token]);
 
-  const { useCalendarioByToken } = useCalendarios();
-  const { useSemanas, useConteudosBySemanas, updateStatus } = useConteudos();
+  const { data: cal, isLoading: loadingCal, error: calError } = useQuery({
+    queryKey: ["calendario-token", token],
+    queryFn: () => CalendarioService.getByToken(token),
+    enabled: !!token,
+  });
 
-  const { data: cal, isLoading: loadingCal, error: calError } = useCalendarioByToken(token);
-  const { data: semanas = [], isLoading: loadingSemanas } = useSemanas(cal?.id ?? "");
-  
+  const { data: semanas = [], isLoading: loadingSemanas } = useQuery({
+    queryKey: ["semanas", cal?.id ?? ""],
+    queryFn: () => ConteudoService.getSemanas(cal!.id),
+    enabled: !!cal?.id,
+  });
+
   const semanaIds = useMemo(() => semanas.map((s) => s.id), [semanas]);
-  
-  const { data: conteudos = [], isLoading: loadingConteudos } = useConteudosBySemanas(semanaIds, true);
+
+  const { data: conteudos = [], isLoading: loadingConteudos } = useQuery({
+    queryKey: ["conteudos", semanaIds, true],
+    queryFn: () => ConteudoService.getConteudosBySemanas(semanaIds, true),
+    enabled: !!semanaIds.length,
+  });
+
+  const updateStatus = useMutation({
+    mutationFn: ({ id, status, comentario }: { id: string; status: Tables<'conteudos'>['status']; comentario?: string }) =>
+      ConteudoService.updateStatus(id, status, comentario),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["conteudos"] });
+      toast.success("Status atualizado com sucesso");
+    },
+    onError: (error: Error) => {
+      toast.error("Erro ao atualizar status: " + error.message);
+    },
+  });
 
   const [comments, setComments] = useState<Record<string, string>>({});
 

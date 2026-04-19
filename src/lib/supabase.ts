@@ -16,12 +16,12 @@ export const supabase = createClient(url, key, {
     storage: localStorage,
   },
   global: {
-    fetch: (url, options = {}) => {
-      const headers = new Headers(options.headers);
+    fetch: (input: RequestInfo | URL, init: RequestInit = {}) => {
+      const headers = new Headers(init.headers);
       if (clientToken) {
         headers.set("x-client-token", clientToken);
       }
-      return fetch(url, { ...options, headers });
+      return fetch(input, { ...init, headers });
     },
   },
 });
