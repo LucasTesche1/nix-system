@@ -84,9 +84,9 @@ const CalendarioEditor = () => {
         <ArrowLeft className="mr-1.5 h-4 w-4" /> Calendários
       </Link>
 
-      <div className="mb-8 flex flex-wrap items-start justify-between gap-6">
-        <div>
-          <div className="flex items-center gap-3">
+      <div className="mb-8 flex flex-col gap-6 md:flex-row md:flex-wrap md:items-start md:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2 md:gap-3">
             <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               {cal.cliente?.nome}
             </div>
@@ -97,14 +97,14 @@ const CalendarioEditor = () => {
               {CALENDAR_STATUS_LABELS[cal.status as keyof typeof CALENDAR_STATUS_LABELS] || cal.status}
             </div>
           </div>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight">{cal.nome}</h1>
-          <p className="mt-1 text-muted-foreground">
+          <h1 className="mt-1 break-words text-2xl font-bold tracking-tight md:text-3xl">{cal.nome}</h1>
+          <p className="mt-1 text-sm text-muted-foreground md:text-base">
             {MESES[cal.mes - 1]} de {cal.ano}
           </p>
         </div>
 
-        <div className="flex flex-col items-end gap-3">
-          <div className="flex gap-2">
+        <div className="flex w-full flex-col gap-3 md:w-auto md:items-end">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             {cal.status === 'active' && cal.token_acesso ? (
               <>
                 <Button variant="outline" onClick={copyLink} className="shadow-sm">
@@ -153,21 +153,21 @@ const CalendarioEditor = () => {
         {semanas.map((s) => {
           const items = conteudos.filter((c) => c.semana_id === s.id);
           return (
-            <section key={s.id} className="rounded-2xl border border-border bg-card p-6">
-              <div className="mb-4 flex items-center justify-between gap-3">
+            <section key={s.id} className="rounded-2xl border border-border bg-card p-4 md:p-6">
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <Input
                   defaultValue={s.nome ?? ""}
                   onBlur={(e) => handleRenameSemana(s.id, e.target.value)}
                   className="max-w-xs border-0 bg-transparent px-0 text-lg font-semibold focus-visible:ring-0"
                 />
-                <div className="flex gap-2">
+                <div className="flex gap-2 sm:flex-none">
                   <Button size="sm" variant="ghost" onClick={() => handleRemoveSemana(s.id)}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
                   <Button
                     size="sm"
                     onClick={() => { setEditing({ semanaId: s.id }); setFormOpen(true); }}
-                    className="bg-gradient-primary"
+                    className="flex-1 bg-gradient-primary sm:flex-none"
                   >
                     <Plus className="mr-1 h-4 w-4" /> Adicionar conteúdo
                   </Button>
@@ -178,7 +178,7 @@ const CalendarioEditor = () => {
                   Nenhum conteúdo nesta semana
                 </div>
               ) : (
-                <div className="grid gap-3 md:grid-cols-2">
+                <div className="grid gap-3 sm:grid-cols-2">
                   {items.map((c) => (
                     <div key={c.id} className="group rounded-xl border border-border bg-background p-4">
                       <div className="mb-2 flex items-start justify-between gap-2">
@@ -200,7 +200,7 @@ const CalendarioEditor = () => {
                               : "Sem data"}
                           </div>
                         </div>
-                        <div className="flex gap-1 opacity-0 transition group-hover:opacity-100">
+                        <div className="flex flex-none gap-1 opacity-100 transition md:opacity-0 md:group-hover:opacity-100">
                           <Button
                             size="icon"
                             variant="ghost"
