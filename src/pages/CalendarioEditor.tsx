@@ -1,22 +1,23 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Plus, Share2, Copy, Check, Loader2, Trash2, Pencil } from "lucide-react";
+import { ArrowLeft, Plus, Share2, Copy, Check, Loader2, Trash2, Pencil, Calendar, ShieldCheck, AlertCircle, MessageCircle } from "lucide-react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ContentForm } from "@/components/ContentForm";
-import { MESES, DIAS_SEMANA } from "@/lib/types";
+import { MESES, DIAS_SEMANA, CALENDAR_STATUS_LABELS } from "@/lib/types";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useCalendarios } from "@/hooks/useCalendarios";
 import { useConteudos } from "@/hooks/useConteudos";
 import { ConteudoCompleto } from "@/services/conteudo.service";
+import { cn } from "@/lib/utils";
 
 const CalendarioEditor = () => {
   const { id = "" } = useParams<{ id: string }>();
-  const { useCalendario, addSemana, updateSemana } = useCalendarios();
+  const { useCalendario, addSemana, updateSemana, ativarCalendario } = useCalendarios();
   const { useSemanas, useConteudosBySemanas, softDelete: deleteItem } = useConteudos();
 
   const { data: cal, isLoading: loadingCal } = useCalendario(id);
@@ -50,12 +51,19 @@ const CalendarioEditor = () => {
   };
 
   const copyLink = () => {
-    if (!cal) return;
+    if (!cal || !cal.token_acesso) return;
     const url = `${window.location.origin}/c/${cal.token_acesso}`;
     navigator.clipboard.writeText(url);
     setCopied(true);
     toast.success("Link copiado!");
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleAtivar = () => {
+    if (cal?.status === 'active' && !confirm("O calendário já está ativo. Deseja regenerar o token e renovar a expiração por mais 7 dias?")) {
+      return;
+    }
+    ativarCalendario.mutate(id);
   };
 
   if (loadingCal || loadingSemanas || !cal) {
@@ -68,32 +76,76 @@ const CalendarioEditor = () => {
     );
   }
 
+  const isExpired = cal.token_expiracao && new Date(cal.token_expiracao) < new Date();
+
   return (
     <AdminLayout>
       <Link to="/" className="mb-6 inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="mr-1.5 h-4 w-4" /> Calendários
       </Link>
 
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-6">
         <div>
-          <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            {cal.cliente?.nome}
+          <div className="flex items-center gap-3">
+            <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              {cal.cliente?.nome}
+            </div>
+            <div className={cn(
+              "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
+              cal.status === 'active' ? "bg-emerald-500/10 text-emerald-500" : "bg-orange-500/10 text-orange-500"
+            )}>
+              {CALENDAR_STATUS_LABELS[cal.status as keyof typeof CALENDAR_STATUS_LABELS] || cal.status}
+            </div>
           </div>
           <h1 className="mt-1 text-3xl font-bold tracking-tight">{cal.nome}</h1>
           <p className="mt-1 text-muted-foreground">
             {MESES[cal.mes - 1]} de {cal.ano}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={copyLink}>
-            {copied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
-            Copiar link do cliente
-          </Button>
-          <Button asChild className="bg-gradient-primary">
-            <a href={`/c/${cal.token_acesso}`} target="_blank" rel="noreferrer">
-              <Share2 className="mr-2 h-4 w-4" /> Abrir visão do cliente
-            </a>
-          </Button>
+
+        <div className="flex flex-col items-end gap-3">
+          <div className="flex gap-2">
+            {cal.status === 'active' && cal.token_acesso ? (
+              <>
+                <Button variant="outline" onClick={copyLink} className="shadow-sm">
+                  {copied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
+                  Copiar link
+                </Button>
+                <Button asChild variant="outline" className="shadow-sm">
+                  <a href={`/c/${cal.token_acesso}`} target="_blank" rel="noreferrer">
+                    <Share2 className="mr-2 h-4 w-4" /> Visualizar
+                  </a>
+                </Button>
+              </>
+            ) : null}
+            <Button 
+              onClick={handleAtivar} 
+              disabled={ativarCalendario.isPending}
+              className={cn(
+                "shadow-glow transition-all",
+                cal.status === 'active' ? "bg-secondary text-foreground hover:bg-secondary/80" : "bg-gradient-primary"
+              )}
+            >
+              {ativarCalendario.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : cal.status === 'active' ? (
+                <ShieldCheck className="mr-2 h-4 w-4" />
+              ) : (
+                <Calendar className="mr-2 h-4 w-4" />
+              )}
+              {cal.status === 'active' ? "Renovar acesso" : "Ativar calendário"}
+            </Button>
+          </div>
+
+          {cal.status === 'active' && cal.token_expiracao && (
+            <div className={cn(
+              "flex items-center gap-1.5 text-xs font-medium",
+              isExpired ? "text-destructive" : "text-muted-foreground"
+            )}>
+              {isExpired ? <AlertCircle className="h-3.5 w-3.5" /> : <Calendar className="h-3.5 w-3.5" />}
+              {isExpired ? "Link expirado" : `Expira em ${format(parseISO(cal.token_expiracao), "dd/MM 'às' HH:mm")}`}
+            </div>
+          )}
         </div>
       </div>
 
@@ -136,6 +188,9 @@ const CalendarioEditor = () => {
                               {c.tipo === "post" ? (c.post as any)?.formato ?? "post" : "story"}
                             </span>
                             <StatusBadge status={c.status} />
+                            {c.comentario_cliente && (
+                              <MessageCircle className="h-4 w-4 text-primary animate-pulse" />
+                            )}
                           </div>
                           <div className="mt-2 text-sm text-muted-foreground">
                             {c.tipo === "post" && c.data_publicacao

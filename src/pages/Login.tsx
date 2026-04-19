@@ -36,10 +36,10 @@ const Login = () => {
       <Card className="w-full max-w-md border-border bg-card/80 backdrop-blur-xl">
         <CardHeader className="space-y-3 text-center">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-primary shadow-glow">
-            <Sparkles className="h-5 w-5 text-primary-foreground" />
+            <img src="/icon-white.png" alt="" />
           </div>
           <CardTitle className="text-2xl font-bold tracking-tight">
-            Entrar no <span className="text-gradient">Cadência</span>
+            Entrar no <span className="text-gradient">Nix</span>
           </CardTitle>
           <p className="text-sm text-muted-foreground">
             Acesse o painel administrativo

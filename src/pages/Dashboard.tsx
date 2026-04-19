@@ -1,16 +1,25 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Calendar as CalIcon, ArrowRight, Loader2 } from "lucide-react";
+import { Plus, Calendar as CalIcon, ArrowRight, Loader2, Calendar, ShieldCheck, Trash2 } from "lucide-react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { Button } from "@/components/ui/button";
-import { MESES } from "@/lib/types";
+import { MESES, CALENDAR_STATUS_LABELS } from "@/lib/types";
 import { CreateCalendarioDialog } from "@/components/CreateCalendarioDialog";
 import { useCalendarios } from "@/hooks/useCalendarios";
+import { cn } from "@/lib/utils";
 
 const Dashboard = () => {
-  const { useCalendariosList } = useCalendarios();
+  const { useCalendariosList, deleteCalendario } = useCalendarios();
   const { data: rows = [], isLoading, refetch } = useCalendariosList();
   const [open, setOpen] = useState(false);
+
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (confirm("Tem certeza que deseja excluir este calendário? Esta ação não pode ser desfeita.")) {
+      deleteCalendario.mutate(id);
+    }
+  };
 
   return (
     <AdminLayout>
@@ -55,8 +64,17 @@ const Dashboard = () => {
             >
               <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-gradient-primary opacity-10 blur-2xl transition group-hover:opacity-20" />
               <div className="relative">
-                <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  {r.cliente?.nome ?? "—"}
+                <div className="flex items-start justify-between">
+                  <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    {r.cliente?.nome ?? "—"}
+                  </div>
+                  <div className={cn(
+                    "flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider",
+                    r.status === 'active' ? "bg-emerald-500/10 text-emerald-500" : "bg-orange-500/10 text-orange-500"
+                  )}>
+                    {r.status === 'active' ? <ShieldCheck className="h-3 w-3" /> : <Calendar className="h-3 w-3" />}
+                    {CALENDAR_STATUS_LABELS[r.status as keyof typeof CALENDAR_STATUS_LABELS] || r.status}
+                  </div>
                 </div>
                 <h3 className="mt-2 text-xl font-bold tracking-tight">{r.nome}</h3>
                 <div className="mt-1 text-sm text-muted-foreground">
@@ -74,8 +92,23 @@ const Dashboard = () => {
                     />
                   </div>
                 </div>
-                <div className="mt-5 flex items-center text-sm font-medium text-primary">
-                  Abrir <ArrowRight className="ml-1 h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
+                <div className="mt-5 flex items-center justify-between text-sm font-medium">
+                  <span className="flex items-center text-primary">
+                    Abrir <ArrowRight className="ml-1 h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    onClick={(e) => handleDelete(e, r.id)}
+                    disabled={deleteCalendario.isPending}
+                  >
+                    {deleteCalendario.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </Button>
                 </div>
               </div>
             </Link>

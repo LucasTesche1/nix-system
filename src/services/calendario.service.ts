@@ -39,8 +39,35 @@ export const CalendarioService = {
       .is("deleted_at", null)
       .single();
 
-    if (error) throw error;
+    if (error || !data) throw new Error("Link inválido");
+
+    if (data.status !== 'active') {
+      throw new Error("Calendário ainda não está ativo");
+    }
+
+    if (data.token_expiracao && new Date(data.token_expiracao) < new Date()) {
+      throw new Error("Link expirado");
+    }
+
     return data;
+  },
+
+  async ativarCalendario(id: string) {
+    const token = crypto.randomUUID();
+    const expiracao = new Date();
+    expiracao.setDate(expiracao.getDate() + 7);
+
+    const { error } = await api
+      .from("calendarios")
+      .update({
+        status: 'active',
+        token_acesso: token,
+        token_expiracao: expiracao.toISOString(),
+      })
+      .eq("id", id);
+
+    if (error) throw error;
+    return { token, expiracao };
   },
 
   async getDashboardData(): Promise<CalendarioComCliente[]> {
@@ -144,6 +171,7 @@ export const CalendarioService = {
         nome: payload.nome.trim(),
         mes: payload.mes,
         ano: payload.ano,
+        status: 'draft',
         token_acesso: payload.token,
       })
       .select()

@@ -80,6 +80,18 @@ export const useCalendarios = () => {
     },
   });
 
+  const ativarCalendario = useMutation({
+    mutationFn: (id: string) => CalendarioService.ativarCalendario(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["calendarios"] });
+      queryClient.invalidateQueries({ queryKey: ["calendario"] });
+      toast.success("Calendário ativado! Link gerado.");
+    },
+    onError: (error: Error) => {
+      toast.error("Erro ao ativar calendário: " + error.message);
+    },
+  });
+
   return {
     useCalendariosList,
     useCalendario,
@@ -89,5 +101,6 @@ export const useCalendarios = () => {
     updateSemana,
     useClientes,
     createCalendario,
+    ativarCalendario,
   };
 };

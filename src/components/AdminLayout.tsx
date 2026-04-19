@@ -22,12 +22,12 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
         <div className="container flex h-16 items-center justify-between">
           <Link to="/" className="flex items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-primary shadow-glow">
-              <Sparkles className="h-4 w-4 text-primary-foreground" />
+              <img src="/icon-white.png" alt="" width={30} height={30} />
             </div>
             <div className="leading-tight">
-              <div className="text-sm font-bold tracking-tight">Cadência</div>
+              <div className="text-sm font-bold tracking-tight">NIX</div>
               <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                Content Studio
+                Oficial System
               </div>
             </div>
           </Link>
