@@ -104,7 +104,9 @@ export const ConteudoService = {
     comentario?: string
   ) {
     const patch: any = { status, updated_at: new Date().toISOString() };
-    if (comentario !== undefined) patch.comentario_cliente = comentario;
+    if (comentario !== undefined) {
+      patch.comentario_cliente = comentario.trim() || null;
+    }
     
     // Regra Crítica: Se conteúdo aprovado for editado -> pending_review
     // (Isso deve ser tratado no update de conteúdo, mas aqui é o status)

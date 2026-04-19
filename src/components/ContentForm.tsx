@@ -14,7 +14,7 @@ import {
   ContentType, PostFormat, ContentStatus,
 } from "@/lib/types";
 import { toast } from "sonner";
-import { Loader2, Plus, X } from "lucide-react";
+import { Loader2, Plus, X, MessageCircle } from "lucide-react";
 import { useConteudos } from "@/hooks/useConteudos";
 import { useCalendarios } from "@/hooks/useCalendarios";
 import { ConteudoCompleto } from "@/services/conteudo.service";
@@ -168,6 +168,17 @@ export const ContentForm = ({ open, onOpenChange, semanaId, calendarioId, conteu
         <div className="space-y-4 py-2">
           {tipo === "post" ? (
             <>
+              {conteudo?.comentario_cliente && (
+                <div className="rounded-xl bg-primary/5 border border-primary/10 p-4 mb-4">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-primary mb-2">
+                    <MessageCircle className="h-3.5 w-3.5" />
+                    Comentário do Cliente
+                  </div>
+                  <p className="text-sm text-foreground/90 leading-relaxed italic">
+                    "{conteudo.comentario_cliente}"
+                  </p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>Data de publicação</Label>
@@ -270,6 +281,17 @@ export const ContentForm = ({ open, onOpenChange, semanaId, calendarioId, conteu
             </>
           ) : (
             <>
+              {conteudo?.comentario_cliente && (
+                <div className="rounded-xl bg-primary/5 border border-primary/10 p-4 mb-4">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-primary mb-2">
+                    <MessageCircle className="h-3.5 w-3.5" />
+                    Comentário do Cliente
+                  </div>
+                  <p className="text-sm text-foreground/90 leading-relaxed italic">
+                    "{conteudo.comentario_cliente}"
+                  </p>
+                </div>
+              )}
               <div>
                 <Label>Dia da semana</Label>
                 <Select value={String(diaSemana)} onValueChange={(v) => setDiaSemana(Number(v))}>

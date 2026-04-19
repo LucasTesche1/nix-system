@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { ptBR } from "date-fns/locale";
 import { useCalendarios } from "@/hooks/useCalendarios";
 import { useConteudos } from "@/hooks/useConteudos";
 import { MESES, DIAS_SEMANA } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 const ClienteView = () => {
   const { token = "" } = useParams<{ token: string }>();
@@ -17,16 +18,17 @@ const ClienteView = () => {
 
   const { data: cal, isLoading: loadingCal, error: calError } = useCalendarioByToken(token);
   const { data: semanas = [], isLoading: loadingSemanas } = useSemanas(cal?.id ?? "");
-  const semanaIds = semanas.map((s) => s.id);
+  
+  const semanaIds = useMemo(() => semanas.map((s) => s.id), [semanas]);
+  
   const { data: conteudos = [], isLoading: loadingConteudos } = useConteudosBySemanas(semanaIds, true);
 
-  const [commentingId, setCommentingId] = useState<string | null>(null);
-  const [comment, setComment] = useState("");
+  const [comments, setComments] = useState<Record<string, string>>({});
 
-  const handleAct = async (id: string, status: "approved" | "rejected", coment?: string) => {
+  const handleAct = async (id: string, status: "approved" | "rejected") => {
+    const coment = comments[id] || "";
     updateStatus.mutate({ id, status, comentario: coment });
-    setCommentingId(null);
-    setComment("");
+    // Limpar comentário local após sucesso se desejar, mas o mutate já vai invalidar a query
   };
 
   if (loadingCal || loadingSemanas || loadingConteudos) {
@@ -38,18 +40,30 @@ const ClienteView = () => {
   }
 
   if (calError || !cal) {
+    const errorMsg = calError instanceof Error ? calError.message : "Link inválido";
+    const subMsg = errorMsg === "Link expirado" 
+      ? "Este link de visualização expirou. Solicite um novo link."
+      : errorMsg === "Calendário ainda não está ativo"
+      ? "Este calendário está sendo preparado e ainda não foi liberado para visualização."
+      : "Calendário não encontrado ou link inválido.";
+
     return (
       <div className="flex min-h-screen items-center justify-center bg-background bg-mesh">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold">Link inválido</h1>
-          <p className="mt-2 text-muted-foreground">Calendário não encontrado ou link inválido.</p>
+        <div className="text-center px-6">
+          <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-secondary/50">
+            <X className="h-10 w-10 text-muted-foreground" />
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight">{errorMsg}</h1>
+          <p className="mt-3 text-lg text-muted-foreground max-w-sm mx-auto">{subMsg}</p>
         </div>
       </div>
     );
   }
 
-  const total = conteudos.length;
-  const approved = conteudos.filter((c) => c.status === "approved").length;
+  const { total, approved } = useMemo(() => ({
+    total: conteudos.length,
+    approved: conteudos.filter((c) => c.status === "approved").length
+  }), [conteudos]);
 
   return (
     <div className="min-h-screen bg-background bg-mesh">
@@ -167,60 +181,51 @@ const ClienteView = () => {
                       )}
 
                       {c.status === "pending_review" && (
-                        <div className="mt-8 flex gap-3 border-t border-border/60 pt-6">
-                          {commentingId === c.id ? (
-                            <div className="w-full space-y-3">
-                              <Textarea
-                                placeholder="Descreva o que precisa ser ajustado…"
-                                value={comment}
-                                onChange={(e) => setComment(e.target.value)}
-                                className="min-h-[100px] rounded-xl"
-                              />
-                              <div className="flex gap-2">
-                                <Button
-                                  variant="destructive"
-                                  className="flex-1"
-                                  onClick={() => handleAct(c.id, "rejected", comment)}
-                                  disabled={!comment.trim() || updateStatus.isPending}
-                                >
-                                  {updateStatus.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-                                  Confirmar reprovação
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  onClick={() => { setCommentingId(null); setComment(""); }}
-                                  disabled={updateStatus.isPending}
-                                >
-                                  Cancelar
-                                </Button>
-                              </div>
-                            </div>
-                          ) : (
-                            <>
-                              <Button
-                                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                                onClick={() => handleAct(c.id, "approved")}
-                                disabled={updateStatus.isPending}
-                              >
-                                <Check className="mr-2 h-4 w-4" /> Aprovar
-                              </Button>
-                              <Button
-                                variant="outline"
-                                className="flex-1 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                                onClick={() => setCommentingId(c.id)}
-                                disabled={updateStatus.isPending}
-                              >
-                                <X className="mr-2 h-4 w-4" /> Solicitar ajustes
-                              </Button>
-                            </>
-                          )}
+                        <div className="mt-8 space-y-4 border-t border-border/60 pt-6">
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground/80">
+                              Feedback (Opcional)
+                            </label>
+                            <Textarea
+                              placeholder="Deixe um comentário para a equipe (opcional)"
+                              value={comments[c.id] ?? ""}
+                              onChange={(e) => setComments(p => ({ ...p, [c.id]: e.target.value }))}
+                              className="min-h-[80px] rounded-xl bg-secondary/20 focus:bg-background transition-colors"
+                            />
+                          </div>
+                          
+                          <div className="flex gap-3">
+                            <Button
+                              className="flex-1 bg-green-600 hover:bg-green-700 text-white shadow-sm"
+                              onClick={() => handleAct(c.id, "approved")}
+                              disabled={updateStatus.isPending}
+                            >
+                              {updateStatus.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
+                              Aprovar
+                            </Button>
+                            <Button
+                              variant="outline"
+                              className="flex-1 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                              onClick={() => handleAct(c.id, "rejected")}
+                              disabled={updateStatus.isPending}
+                            >
+                              {updateStatus.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <X className="mr-2 h-4 w-4" />}
+                              Solicitar ajustes
+                            </Button>
+                          </div>
                         </div>
                       )}
 
-                      {c.status === "rejected" && c.comentario_cliente && (
-                        <div className="mt-4 rounded-xl bg-red-50 p-4 text-sm text-red-800 border border-red-100">
+                      {c.comentario_cliente && c.status !== "pending_review" && (
+                        <div className={cn(
+                          "mt-4 rounded-xl p-4 text-sm border transition-colors",
+                          c.status === "rejected" 
+                            ? "bg-red-50 text-red-800 border-red-100" 
+                            : "bg-emerald-50 text-emerald-800 border-emerald-100"
+                        )}>
                           <div className="flex items-center gap-2 font-bold mb-1">
-                            <MessageCircle className="h-3.5 w-3.5" /> Ajustes solicitados
+                            <MessageCircle className="h-3.5 w-3.5" /> 
+                            {c.status === "rejected" ? "Ajustes solicitados" : "Comentário da aprovação"}
                           </div>
                           {c.comentario_cliente}
                         </div>
@@ -247,3 +252,4 @@ const Field = ({ label, value }: { label: string; value: string }) => (
 );
 
 export default ClienteView;
+

@@ -16,7 +16,9 @@ export interface Database {
           nome: string
           mes: number
           ano: number
-          token_acesso: string
+          status: 'draft' | 'active' | 'archived'
+          token_acesso: string | null
+          token_expiracao: string | null
           created_at: string
           deleted_at: string | null
         }
@@ -26,7 +28,9 @@ export interface Database {
           nome: string
           mes: number
           ano: number
-          token_acesso: string
+          status?: 'draft' | 'active' | 'archived'
+          token_acesso?: string | null
+          token_expiracao?: string | null
           created_at?: string
           deleted_at?: string | null
         }
@@ -36,7 +40,9 @@ export interface Database {
           nome?: string
           mes?: number
           ano?: number
-          token_acesso?: string
+          status?: 'draft' | 'active' | 'archived'
+          token_acesso?: string | null
+          token_expiracao?: string | null
           created_at?: string
           deleted_at?: string | null
         }
