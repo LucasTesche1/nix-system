@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Plus, Share2, Copy, Check, Loader2, Trash2, Pencil, Calendar, ShieldCheck, AlertCircle, MessageCircle } from "lucide-react";
+import { ArrowLeft, Plus, Share2, Copy, Check, Loader2, Trash2, Pencil, Calendar, ShieldCheck, AlertCircle, MessageCircle, FileDown } from "lucide-react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,8 +17,14 @@ import { cn } from "@/lib/utils";
 
 const CalendarioEditor = () => {
   const { id = "" } = useParams<{ id: string }>();
-  const { useCalendario, addSemana, updateSemana, ativarCalendario } = useCalendarios();
+  const { useCalendario, addSemana, updateSemana, ativarCalendario, registrarAcesso, exportarPDF } = useCalendarios();
   const { useSemanas, useConteudosBySemanas, softDelete: deleteItem } = useConteudos();
+
+  useEffect(() => {
+    if (id) {
+      registrarAcesso.mutate(id);
+    }
+  }, [id]);
 
   const { data: cal, isLoading: loadingCal } = useCalendario(id);
   const { data: semanas = [], isLoading: loadingSemanas } = useSemanas(id);
@@ -28,6 +34,119 @@ const CalendarioEditor = () => {
   const [copied, setCopied] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<{ semanaId: string; conteudo?: ConteudoCompleto } | null>(null);
+
+  const handleExportPDF = async () => {
+    try {
+      const data = await exportarPDF.mutateAsync(id);
+      if (!data) return toast.error("Calendário não encontrado");
+
+      const semanasComVideo = (data as any).semanas?.filter((s: any) => 
+        s.conteudos?.some((c: any) => c.post?.formato === 'video')
+      ) || [];
+      
+      if (semanasComVideo.length === 0) {
+        return toast.info("Nenhum vídeo encontrado para exportar");
+      }
+
+      const { default: jsPDF } = await import("jspdf");
+      const doc = new jsPDF();
+      const margin = 20;
+      let y = margin;
+
+      // Marca d'água / Header "Agência Nix"
+      doc.setTextColor(255, 123, 44); // #ff792c85
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.text("Agência Nix", 105, y, { align: "center" });
+      y += 12;
+
+      // Cabeçalho Principal
+      doc.setTextColor(0, 0, 0); // Reset to black
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(22);
+      doc.text("Roteiros de Vídeo", 105, y, { align: "center" });
+      y += 12;
+      
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Cliente: ${(data as any).cliente?.nome || 'N/A'}`, margin, y);
+      y += 7;
+      doc.text(`Mês de Referência: ${MESES[data.mes - 1]} / ${data.ano}`, margin, y);
+      y += 10;
+      
+      doc.setDrawColor(0);
+      doc.setLineWidth(0.5);
+      doc.line(margin, y, 190, y);
+      y += 15;
+
+      semanasComVideo.forEach((semana: any) => {
+        const videosDaSemana = semana.conteudos.filter((c: any) => c.post?.formato === 'video');
+        if (videosDaSemana.length === 0) return;
+
+        // Título da Semana
+        if (y > 240) { doc.addPage(); y = margin; }
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text(`[Semana ${semana.ordem} — ${semana.nome || `Semana ${semana.ordem}`}]`, margin, y);
+        y += 12;
+
+        videosDaSemana.forEach((conteudo: any, cIdx: number) => {
+          if (y > 230) { doc.addPage(); y = margin; }
+
+          doc.setFontSize(11);
+          doc.setFont("helvetica", "bold");
+          doc.text(`Conteúdo #${cIdx + 1}`, margin + 5, y);
+          y += 7;
+
+          doc.setFont("helvetica", "normal");
+          const dataFormatada = conteudo.data_publicacao 
+            ? format(parseISO(conteudo.data_publicacao), "dd/MM/yyyy")
+            : "Sem data";
+          
+          doc.text(`Data: ${dataFormatada}`, margin + 10, y);
+          y += 10;
+
+          // Acessando os dados do vídeo (gancho, desenvolvimento, cta)
+          // Verificando se vem como array ou objeto único (tabela post_videos)
+          const videoData = Array.isArray(conteudo.post?.post_videos) 
+            ? conteudo.post.post_videos[0] 
+            : conteudo.post?.post_videos;
+          
+          const drawField = (label: string, value: string | null | undefined) => {
+            if (!value) return;
+            if (y > 260) { doc.addPage(); y = margin; }
+            doc.setFont("helvetica", "bold");
+            doc.text(`${label}:`, margin + 10, y);
+            doc.setFont("helvetica", "normal");
+            
+            const lines = doc.splitTextToSize(value, 140);
+            doc.text(lines, margin + 45, y);
+            y += (lines.length * 6) + 4;
+          };
+
+          drawField("Gancho", videoData?.gancho);
+          drawField("Desenvolvimento", videoData?.desenvolvimento);
+          drawField("CTA", videoData?.cta);
+          drawField("Legenda", conteudo.post?.legenda);
+          drawField("Link do Drive", conteudo.post?.drive_url);
+
+          y += 5;
+          doc.setDrawColor(220);
+          doc.line(margin + 10, y, 100, y);
+          y += 15;
+        });
+
+        y += 5;
+      });
+
+      const fileName = `Calendario_${MESES[data.mes - 1]}_${(data as any).cliente?.nome || 'Cliente'}.pdf`;
+      doc.save(fileName);
+      toast.success("PDF gerado com sucesso!");
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao gerar PDF");
+    }
+  };
 
   const handleAddSemana = async () => {
     const ordem = (semanas[semanas.length - 1]?.ordem ?? 0) + 1;
@@ -118,6 +237,19 @@ const CalendarioEditor = () => {
                 </Button>
               </>
             ) : null}
+            <Button
+              variant="outline"
+              onClick={handleExportPDF}
+              disabled={exportarPDF.isPending}
+              className="shadow-sm"
+            >
+              {exportarPDF.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <FileDown className="mr-2 h-4 w-4" />
+              )}
+              {exportarPDF.isPending ? "Gerando PDF..." : "Exportar PDF"}
+            </Button>
             <Button 
               onClick={handleAtivar} 
               disabled={ativarCalendario.isPending}
