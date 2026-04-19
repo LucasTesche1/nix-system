@@ -19,6 +19,7 @@ export interface Database {
           status: 'draft' | 'active' | 'archived'
           token_acesso: string | null
           token_expiracao: string | null
+          ultimo_acesso_profissional: string | null
           created_at: string
           deleted_at: string | null
         }
@@ -31,6 +32,7 @@ export interface Database {
           status?: 'draft' | 'active' | 'archived'
           token_acesso?: string | null
           token_expiracao?: string | null
+          ultimo_acesso_profissional?: string | null
           created_at?: string
           deleted_at?: string | null
         }
@@ -43,6 +45,7 @@ export interface Database {
           status?: 'draft' | 'active' | 'archived'
           token_acesso?: string | null
           token_expiracao?: string | null
+          ultimo_acesso_profissional?: string | null
           created_at?: string
           deleted_at?: string | null
         }
