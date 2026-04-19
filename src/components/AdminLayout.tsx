@@ -1,9 +1,21 @@
-import { Link, useLocation } from "react-router-dom";
-import { Calendar, Sparkles } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Calendar, LogOut, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
 export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
   const loc = useLocation();
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
+
+  const handleLogout = async () => {
+    await signOut();
+    toast.success("Sessão encerrada");
+    navigate("/login", { replace: true });
+  };
+
   return (
     <div className="min-h-screen bg-background bg-mesh">
       <header className="sticky top-0 z-30 border-b border-border/60 bg-background/80 backdrop-blur-xl">
@@ -32,6 +44,15 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
               <Calendar className="h-4 w-4" />
               Calendários
             </Link>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              className="ml-1 text-muted-foreground hover:text-foreground"
+            >
+              <LogOut className="h-4 w-4" />
+              Sair
+            </Button>
           </nav>
         </div>
       </header>
