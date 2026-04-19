@@ -23,16 +23,16 @@ const Dashboard = () => {
 
   return (
     <AdminLayout>
-      <div className="mb-10 flex items-end justify-between">
+      <div className="mb-8 flex flex-col items-start justify-between gap-4 md:mb-10 md:flex-row md:items-end">
         <div>
-          <h1 className="text-4xl font-bold tracking-tight">
+          <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
             Seus <span className="text-gradient">calendários</span>
           </h1>
-          <p className="mt-2 text-muted-foreground">
+          <p className="mt-2 text-sm text-muted-foreground md:text-base">
             Crie, gerencie e compartilhe calendários de conteúdo com seus clientes.
           </p>
         </div>
-        <Button onClick={() => setOpen(true)} className="bg-gradient-primary shadow-glow hover:opacity-90">
+        <Button onClick={() => setOpen(true)} className="w-full bg-gradient-primary shadow-glow hover:opacity-90 md:w-auto">
           <Plus className="mr-2 h-4 w-4" /> Criar calendário
         </Button>
       </div>
@@ -55,7 +55,7 @@ const Dashboard = () => {
           </Button>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {rows.map((r) => (
             <Link
               key={r.id}
