@@ -317,7 +317,11 @@ const CalendarioEditor = () => {
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="rounded-md bg-secondary px-2 py-0.5 text-xs font-semibold uppercase tracking-wider">
-                              {c.tipo === "post" ? (c.post as any)?.formato ?? "post" : "story"}
+                              {c.tipo === "post"
+                                ? (c.post as any)?.formato ?? "post"
+                                : c.tipo === "story"
+                                ? "story"
+                                : "automação"}
                             </span>
                             <StatusBadge status={c.status} />
                             {c.comentario_cliente && (
@@ -349,6 +353,8 @@ const CalendarioEditor = () => {
                       <p className="line-clamp-2 text-sm">
                         {c.tipo === "story"
                           ? c.story?.texto
+                          : c.tipo === "automacoes"
+                          ? `${c.automacoes?.titulo}: ${c.automacoes?.texto}`
                           : (c.post as any)?.formato === "video"
                           ? (c.post as any)?.video?.gancho
                           : (c.post as any)?.formato === "estatico"

@@ -1,0 +1,361 @@
+# 📄 SPEC — Sistema de Calendário de Conteúdo para Social Media
+
+## 1. 🎯 Objetivo do Sistema
+
+Sistema web para criação, gestão e validação de calendários de conteúdo entre uma profissional de social media e seus clientes, com foco em:
+
+* Simplicidade extrema para o cliente
+* Controle total para a profissional
+* Fluxo claro de aprovação de conteúdo
+
+---
+
+## 2. 👥 Atores
+
+### 2.1 Profissional (Admin)
+
+* Criar, editar e excluir calendários
+* Criar, editar e excluir posts e stories
+* Gerar link de acesso para clientes
+* Visualizar status de aprovação
+* Exportar calendário em PDF
+
+### 2.2 Cliente (Viewer/Validator)
+
+* Acessar calendário via link único
+* Visualizar conteúdos
+* Alterar status de aprovação
+* Adicionar comentário (opcional)
+
+---
+
+## 3. 🧩 Entidades do Sistema
+
+### 3.1 Cliente
+
+* id
+* nome
+* created_at
+* updated_at
+* deleted_at
+
+---
+
+### 3.2 Calendário
+
+* id
+* cliente_id
+* nome
+* mes (1–12)
+* ano
+* status (draft | active | archived)
+* token_acesso (único)
+* token_expiracao (nullable)
+* created_at
+* updated_at
+* deleted_at
+
+---
+
+### 3.3 Semana (agrupador visual)
+
+* id
+* calendario_id
+* nome (ex: “Semana 1”)
+* ordem
+* created_at
+* updated_at
+* deleted_at
+
+---
+
+### 3.4 Conteúdo (abstração base)
+
+* id
+* calendario_id
+* semana_id
+* tipo (post | story)
+* status (draft | pending_review | approved | rejected)
+* data_publicacao (nullable para story)
+* dia_semana (nullable para post)
+* comentario_cliente (nullable)
+* version (int)
+* created_at
+* updated_at
+* deleted_at
+
+---
+
+### 3.5 Post (detalhes específicos)
+
+* id
+* conteudo_id
+* formato (video | carrossel | estatico)
+* legenda (text)
+* drive_url
+* created_at
+* updated_at
+* deleted_at
+
+---
+
+### 3.6 PostVideo
+
+* id
+* post_id
+* gancho
+* desenvolvimento
+* cta
+
+---
+
+### 3.7 PostEstatico
+
+* id
+* post_id
+* ideia
+* imagem_url
+
+---
+
+### 3.8 PostCarrossel
+
+* id
+* post_id
+* ideia
+
+---
+
+### 3.9 PostCarrosselImagem
+
+* id
+* carrossel_id
+* imagem_url
+* ordem
+
+---
+
+### 3.10 Story
+
+* id
+* conteudo_id
+* texto
+
+---
+
+## 4. 🔁 Fluxos Principais
+
+---
+
+### 4.1 Criação de Calendário (Admin)
+
+1. Criar cliente (ou selecionar existente)
+2. Criar calendário:
+
+   * nome
+   * mês
+   * ano
+3. Criar semanas (ordenadas)
+4. Criar conteúdos dentro das semanas:
+
+   * tipo: post ou story
+5. Preencher dados obrigatórios conforme tipo
+6. Salvar conteúdo como `draft` ou `pending_review`
+
+---
+
+### 4.2 Envio para Cliente
+
+1. Profissional ativa calendário (`active`)
+2. Sistema gera `token_acesso`
+3. Profissional compartilha link
+
+---
+
+### 4.3 Validação pelo Cliente
+
+1. Cliente acessa via token
+2. Visualiza calendário completo
+3. Para cada conteúdo:
+
+   * pode alterar status:
+
+     * `pending_review` → `approved` ou `rejected`
+   * pode adicionar comentário
+4. Não pode editar conteúdo
+
+---
+
+### 4.4 Pós-validação
+
+1. Profissional visualiza status geral
+2. Pode editar conteúdos rejeitados
+3. Ao editar conteúdo aprovado:
+
+   * status volta automaticamente para `pending_review`
+   * version incrementa
+
+---
+
+## 5. 📏 Regras de Negócio
+
+---
+
+### 5.1 Estados de Conteúdo
+
+* draft → invisível para cliente
+* pending_review → visível e editável pelo cliente (status)
+* approved → aprovado
+* rejected → reprovado
+
+---
+
+### 5.2 Controle de Edição
+
+* Cliente:
+
+  * só altera status e comentário
+* Profissional:
+
+  * pode alterar tudo
+* Se conteúdo aprovado for alterado:
+
+  * status = pending_review
+  * version++
+
+---
+
+### 5.3 Validação por Tipo
+
+#### POST
+
+* video:
+
+  * gancho (obrigatório)
+  * desenvolvimento (obrigatório)
+  * cta (obrigatório)
+
+* estatico:
+
+  * ideia (obrigatório)
+  * imagem_url (opcional)
+
+* carrossel:
+
+  * ideia (obrigatório)
+  * ≥ 1 imagem (opcional)
+
+---
+
+#### STORY
+
+* texto obrigatório
+* dia_semana obrigatório
+
+---
+
+### 5.4 Regras de Data
+
+* data_publicacao deve estar dentro do mês/ano do calendário
+* story deve respeitar dia_semana válido
+* (opcional futuro) evitar duplicidade de horário
+
+---
+
+### 5.5 Token de Acesso
+
+* único por calendário
+* acesso sem login
+* pode ter expiração
+* inválido se:
+
+  * calendário deletado
+  * token expirado
+
+---
+
+### 5.6 Soft Delete
+
+* todas entidades possuem `deleted_at`
+* dados não são removidos fisicamente
+* registros deletados não aparecem em queries padrão
+
+---
+
+### 5.7 Exclusão em Cascata (lógica)
+
+* deletar calendário → remove semanas + conteúdos + posts + stories
+* deletar conteúdo → remove entidades filhas
+
+---
+
+### 5.8 Versionamento
+
+* campo `version` inicia em 1
+* incrementa a cada edição relevante
+* usado para controle de alteração pós-aprovação
+
+---
+
+## 6. 📤 Exportação
+
+* Exportar calendário em PDF
+* Formato inicial:
+
+  * lista estruturada por semana
+  * conteúdos com:
+
+    * tipo
+    * data
+    * legenda
+    * status
+    * caso seja vídeo(data, roteiro, link do drive)
+
+---
+
+## 7. 🎨 Requisitos de UX (CRÍTICOS)
+
+---
+
+### Cliente:
+
+* Interface minimalista
+* Sem menus complexos
+* Foco:
+
+  * visualizar conteúdo
+  * aprovar/reprovar
+* Exibir:
+
+  * progresso de aprovação (% ou contagem)
+* Feedback visual claro por status
+
+---
+
+### Profissional:
+
+* Interface completa
+* Edição fluida
+* Organização por semanas
+
+---
+
+## 8. ⚠️ Restrições Técnicas
+
+* Sistema deve ser stateless no acesso do cliente (via token)
+* Backend deve validar TODAS regras (não confiar no frontend)
+* URLs externas (drive) devem ser validadas minimamente
+* Estrutura preparada para múltiplos clientes (não hardcoded)
+
+---
+
+## 9. 🚀 Extensões Futuras (não obrigatórias agora)
+
+* Comentários em tempo real
+* Notificações (email/webhook)
+* Preview de mídia
+* Multi-profissionais
+* Templates de calendário
+
+---
+

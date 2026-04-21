@@ -156,13 +156,19 @@ const ClienteView = () => {
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 bg-secondary/30 px-4 py-3 sm:px-5">
                       <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
                         <span className="rounded-md bg-background px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                          {c.tipo === "post" ? (c.post as any)?.formato : "Story"}
+                          {c.tipo === "post" 
+                            ? (c.post as any)?.formato 
+                            : c.tipo === "story" 
+                            ? "Story" 
+                            : "Automação"}
                         </span>
                         <span className="truncate text-xs font-medium sm:text-sm">
                           {c.tipo === "post" && c.data_publicacao
                             ? format(parseISO(c.data_publicacao), "EEEE, dd 'de' MMM", { locale: ptBR })
                             : c.tipo === "story" && c.dia_semana !== null
                             ? DIAS_SEMANA[c.dia_semana!]
+                            : c.tipo === "automacoes"
+                            ? c.automacoes?.titulo
                             : ""}
                         </span>
                       </div>
@@ -174,6 +180,12 @@ const ClienteView = () => {
                         <p className="whitespace-pre-wrap text-[15px] leading-relaxed">
                           {c.story?.texto}
                         </p>
+                      )}
+
+                      {c.tipo === "automacoes" && (
+                        <div className="space-y-3">
+                          <Field label="Fluxo" value={c.automacoes?.texto ?? ""} />
+                        </div>
                       )}
 
                       {c.tipo === "post" && (c.post as any)?.formato === "video" && (c.post as any).video && (
