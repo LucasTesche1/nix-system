@@ -1,191 +1,191 @@
+
 ## 📄 Contexto
 
-A Profissional precisa compartilhar o roteiro de vídeos do mês com o cliente ou
-parceiros de produção em um formato portátil e padronizado.
+O sistema atualmente suporta dois tipos de conteúdo: `post` e `story`. A Profissional
+precisa incluir automações de fluxo (ex: sequências de mensagens, respostas automáticas)
+no calendário de conteúdo, de forma que o cliente também possa revisar, aprovar ou
+reprovar esse tipo de entrega.
 
-Atualmente não existe nenhuma funcionalidade de exportação no sistema. Todo o
-conteúdo está disponível apenas dentro da interface web, o que torna inviável
-o compartilhamento externo sem acesso ao sistema.
+Como automações são uma entidade distinta de posts e stories — com campos próprios
+e sem relação com formatos de mídia — elas devem ser tratadas como um novo tipo
+de conteúdo dentro do sistema.
 
-**Impacto:** A Profissional perde tempo recriando manualmente documentos de
-roteiro em ferramentas externas, aumentando o risco de inconsistências entre
-o que está no sistema e o que foi enviado para produção.
+**Impacto:** Sem esse tipo, a Profissional é obrigada a gerenciar automações fora
+do sistema, quebrando o fluxo centralizado de aprovação e perdendo o histórico
+de validação pelo cliente.
 
 ---
 
 ## 🎯 Objetivo
 
-Permitir que a Profissional exporte, com um clique, um PDF estruturado contendo
-todos os conteúdos do tipo **vídeo** de um calendário, organizados por semana,
-com todas as informações de roteiro e o link do Drive.
+Adicionar `automacao` como terceiro tipo válido de conteúdo, composto por `titulo`
+e `fluxo` (texto livre), participando do mesmo ciclo de aprovação já existente
+para posts e stories.
 
 ---
 
 ## 🧩 Escopo
 
-- Botão "Exportar PDF" na página de detalhes do calendário
-- Geração do PDF no frontend com estrutura organizada por semana
-- Exportar **apenas** conteúdos do tipo `post` com `formato = 'video'`
-- Incluir todas as informações do roteiro: `gancho`, `desenvolvimento`, `cta`,
-  `legenda` e `drive_url`
-- Nome do arquivo gerado: `Calendario_<mes>_<nome_do_cliente>`
+- Adicionar `'automacao'` ao CHECK constraint do campo `tipo` na tabela `conteudos`
+- Executar migração para criação da tabela `automacoes` conforme schema fornecido
+- Adicionar coluna `titulo` à tabela `automacoes`
+- Implementar criação, edição e exibição de automações na interface da Profissional
+- Exibir automações na interface do cliente para aprovação/reprovação e comentário
+- Integrar ao service e composables existentes seguindo a arquitetura do projeto
 
 ---
 
 ## 🚫 Fora do Escopo
 
-- Exportação de stories
-- Exportação de posts estáticos ou carrosseis
-- Exportação de calendários no formato `.docx`
-- Agendamento ou envio automático do PDF por e-mail
-- Exportação em lote de múltiplos calendários
-- Filtro por status antes de exportar (exporta todos os vídeos independente de status)
+- Execução ou integração real com ferramentas de automação externas
+- Preview de fluxo em formato visual (ex: diagrama de nós)
+- Versionamento diferenciado de automações em relação aos demais conteúdos
+- Exportação de automações no PDF (escopo do PDF atual cobre apenas vídeos)
 
 ---
 
 ## ⚙️ Requisitos Técnicos
 
-### Botão de Exportação
+### Alterações no Banco
 
-- Localização: página de detalhes do calendário, no cabeçalho ou barra de ações
-- Label: `Exportar PDF`
-- Deve estar disponível apenas para a Profissional (não aparece na view do cliente)
-- Durante a geração, exibir estado de loading no botão (`Gerando PDF...`)
-- Em caso de erro, exibir toast de erro
+**1. Atualizar CHECK constraint em `conteudos.tipo`:**
 
-### Dados Necessários para o PDF
+```sql
+ALTER TABLE conteudos
+DROP CONSTRAINT conteudos_tipo_check;
 
-O service deve buscar, para o calendário em questão:
-
-```
-calendarios
-  └── nome, mes, ano
-      └── clientes
-            └── nome
-      └── semanas (ordenadas por `ordem`)
-            └── nome, ordem
-                └── conteudos (tipo = 'post', formato = 'video', deleted_at IS NULL)
-                      └── data_publicacao, dia_semana, status
-                          └── posts
-                                └── legenda, drive_url
-                                    └── post_videos
-                                          └── gancho, desenvolvimento, cta
+ALTER TABLE conteudos
+ADD CONSTRAINT conteudos_tipo_check
+CHECK (tipo IN ('post', 'story', 'automacoes'));
 ```
 
-### Estrutura do PDF
+**2. Criar tabela `automacoes` conforme schema fornecido + coluna `titulo`:**
 
-Hierarquia do documento:
+```sql
+CREATE TABLE public.automacoes (
+  id          UUID NOT NULL DEFAULT gen_random_uuid(),
+  conteudo_id UUID UNIQUE REFERENCES conteudos(id),
+  titulo      TEXT NOT NULL,
+  texto       TEXT NOT NULL,
 
-```
-[Cabeçalho]
-Calendário: <nome do calendário>
-Cliente: <nome do cliente>
-Mês de Referência: <mês por extenso> / <ano>
-
-──────────────────────────────────────
-
-[Semana 1 — <nome da semana>]
-
-  [Conteúdo #1]
-  Data: <data_publicacao formatada (ex: 05/07/2025)>
-  Dia da semana: <ex: Segunda-feira>
-
-  Gancho:        <gancho>
-  Desenvolvimento: <desenvolvimento>
-  CTA:           <cta>
-  Legenda:       <legenda>
-  Link do Drive: <drive_url>
-
-  ──────────────
-
-  [Conteúdo #2]
-  ...
-
-[Semana 2 — <nome da semana>]
-...
+  CONSTRAINT automacoes_pkey PRIMARY KEY (id)
+);
 ```
 
-### Nome do Arquivo
+> O campo `fluxo` descrito na spec será persistido na coluna `texto` conforme
+> o schema fornecido. O alias "fluxo" deve ser usado apenas na camada de UI/UX.
 
-Padrão: `Calendario_<mes_por_extenso>_<nome_do_cliente>.pdf`
+---
 
-Exemplos:
-- `Calendario_Julho_Marca X.pdf`
-- `Calendario_Outubro_Studio Y.pdf`
+### Campos da Entidade
 
-Regras:
-- Mês por extenso em português (ex: `Janeiro`, `Fevereiro`)
-- Nome do cliente sem normalização (usar como está no banco)
-- Separador `_` entre os segmentos
+| Campo        | Coluna no banco | Obrigatório | Descrição                        |
+|--------------|-----------------|-------------|----------------------------------|
+| Título       | `titulo`        | Sim         | Nome da automação                |
+| Fluxo        | `texto`         | Sim         | Descrição textual do fluxo       |
+| conteudo_id  | `conteudo_id`   | Sim         | Referência ao conteúdo base      |
 
-### Biblioteca Sugerida
+---
 
-Utilizar `jsPDF` + `jsPDF-AutoTable` para geração no frontend, sem dependência
-de backend ou serviço externo.
+### Criação de Automação (Profissional)
+
+Ao criar um conteúdo do tipo `automacao`, o service deve:
+
+1. Inserir na tabela `conteudos` com `tipo = 'automacao'`
+2. Inserir na tabela `automacoes` com `titulo` e `texto` vinculados ao `conteudo_id`
+
+Ambas as operações devem ocorrer de forma atômica (sequencial com rollback em caso
+de falha na segunda inserção).
+
+### Edição de Automação (Profissional)
+
+- Permite editar `titulo` e `texto` em `automacoes`
+- Permite editar campos base em `conteudos` (`data_publicacao`, `semana_id`, etc.)
+- Se o conteúdo estiver com `status = 'approved'` ao ser editado:
+  - `status` volta para `pending_review` (comportamento já existente via trigger)
+  - `version` é incrementado automaticamente
+
+### Validação pelo Cliente
+
+- O cliente visualiza automações junto aos demais conteúdos do calendário
+- Pode alterar `status`: `pending_review` → `approved` ou `rejected`
+- Pode adicionar `comentario_cliente` (opcional)
+- Não pode editar `titulo` nem `texto`
 
 ---
 
 ## 🗄️ Impacto em Dados
 
-Nenhuma alteração de schema necessária.
+**Tabelas afetadas:**
 
-**Método a implementar em `calendarios.service.ts`:**
+| Tabela       | Tipo de alteração                                              |
+|--------------|----------------------------------------------------------------|
+| `conteudos`  | Atualização do CHECK constraint para incluir `'automacao'`    |
+| `automacoes` | Criação da tabela (schema fornecido + coluna `titulo`)        |
 
-- `buscarDadosExportacao(calendario_id)` → retorna calendário com cliente, semanas
-  e conteúdos do tipo vídeo com todos os joins necessários, respeitando
-  `deleted_at IS NULL` em todas as tabelas
+**Método a implementar em `conteudos.service.ts` (ou `automacoes.service.ts`):**
 
-**Tabelas envolvidas (somente leitura):**
-
-| Tabela          | Uso                                          |
-|-----------------|----------------------------------------------|
-| `calendarios`   | Nome, mês, ano                               |
-| `clientes`      | Nome do cliente para título e nome do arquivo |
-| `semanas`       | Agrupamento visual, ordenado por `ordem`     |
-| `conteudos`     | Filtrado por `tipo = 'post'`, `deleted_at IS NULL` |
-| `posts`         | `formato = 'video'`, `legenda`, `drive_url`  |
-| `post_videos`   | `gancho`, `desenvolvimento`, `cta`           |
+- `criarAutomacao({ conteudo, automacao })` → insere em `conteudos` + `automacoes`
+- `atualizarAutomacao({ conteudo_id, titulo, texto })` → atualiza `automacoes`
+- `buscarAutomacaoPorConteudo(conteudo_id)` → retorna dados completos com join
 
 ---
 
 ## 🔐 Segurança
 
-- O botão de exportação deve ser visível **apenas para a Profissional autenticada**
-- A query de exportação deve respeitar as políticas RLS existentes
-- `drive_url` deve ser renderizado como texto simples no PDF (não como iframe ou
-  link executável embutido)
+- A tabela `automacoes` deve ter política RLS equivalente às demais tabelas filhas
+  (`posts`, `stories`), herdando o controle via `conteudo_id → calendario_id → cliente_id`
+- O cliente não pode escrever em `automacoes` diretamente — apenas em `status` e
+  `comentario_cliente` via `conteudos`
+
+**Política RLS sugerida:**
+
+```sql
+CREATE POLICY "Owner access automacoes"
+ON automacoes
+FOR ALL
+USING (
+  EXISTS (
+    SELECT 1
+    FROM conteudos co
+    JOIN calendarios c ON c.id = co.calendario_id
+    WHERE co.id = automacoes.conteudo_id
+      AND is_owner(c.cliente_id)
+  )
+)
+WITH CHECK (TRUE);
+```
 
 ---
 
 ## 🧪 Critérios de Aceite
 
-- [ ] O botão "Exportar PDF" aparece na página de detalhes do calendário para
-      a Profissional
-- [ ] O botão **não aparece** na interface de visualização do cliente
-- [ ] Ao clicar, o PDF é gerado e o download é iniciado automaticamente
-- [ ] O PDF contém apenas conteúdos com `formato = 'video'`
-- [ ] Stories, posts estáticos e carrosseis **não aparecem** no PDF
-- [ ] Os conteúdos estão agrupados por semana, respeitando a ordem das semanas
-- [ ] Cada conteúdo exibe: data, dia da semana, gancho, desenvolvimento, CTA,
-      legenda e link do Drive
-- [ ] O nome do arquivo segue o padrão `Calendario_<mes>_<nome_cliente>.pdf`
-- [ ] Se o calendário não tiver nenhum vídeo, exibir toast informativo:
-      `"Nenhum vídeo encontrado para exportar"` e não gerar o PDF
-- [ ] Durante a geração, o botão exibe estado de loading
-- [ ] Em caso de erro na geração, um toast de erro é exibido
+- [ ] A Profissional consegue criar um conteúdo do tipo `automacao` informando
+      `titulo` e `fluxo`
+- [ ] A automação aparece agrupada na semana correta dentro do calendário
+- [ ] A Profissional consegue editar `titulo` e `fluxo` de uma automação existente
+- [ ] Ao editar uma automação com `status = 'approved'`, o status volta para
+      `pending_review` e `version` é incrementado
+- [ ] A automação aparece na interface do cliente junto aos demais conteúdos
+- [ ] O cliente consegue aprovar uma automação
+- [ ] O cliente consegue reprovar uma automação
+- [ ] O cliente consegue deixar um comentário ao aprovar ou reprovar
+- [ ] Automações com `status = 'draft'` **não aparecem** para o cliente
+- [ ] A tabela `automacoes` possui RLS equivalente às demais tabelas filhas
+- [ ] O CHECK constraint de `conteudos.tipo` aceita `'automacao'` sem erro
 
 ---
 
 ## 🧠 Observações Técnicas
 
-- **Suposição:** a geração do PDF ocorre inteiramente no frontend — sem endpoint
-  dedicado no backend
-- **Suposição:** exportar todos os vídeos independentemente do `status`
-  (draft, approved, rejected); se houver necessidade de filtrar por status,
-  deve ser tratado como escopo futuro
-- O join entre `conteudos → posts → post_videos` deve ser feito em uma única
-  query com select aninhado (sintaxe PostgREST do Supabase) para evitar N+1
+- **Suposição:** o campo `fluxo` na especificação corresponde à coluna `texto`
+  do schema fornecido — a UI deve exibir o label "Fluxo" mas persistir em `texto`
+- **Suposição:** automações não possuem `deleted_at` próprio — o soft delete é
+  controlado pelo `deleted_at` do `conteudo` pai, seguindo o padrão das demais
+  entidades filhas (`post_videos`, `stories`, etc.)
+- A constraint `UNIQUE` em `conteudo_id` já está no schema fornecido, garantindo
+  relação 1:1 entre `conteudos` e `automacoes`
 - Seguir o fluxo obrigatório: `Page → Composable → Service → api.ts → Supabase`
-- O mês por extenso pode ser derivado do campo `mes` (INT) com um simples mapa
-  estático em português — não depender de `Intl` para garantir consistência
+- O trigger `trg_conteudos_version` já cobre o incremento de `version` e reset
+  de `status` — nenhuma lógica adicional necessária para esse comportamento
 ````

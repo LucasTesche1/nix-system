@@ -8,6 +8,7 @@ export type ConteudoCompleto = Tables<'conteudos'> & {
     carrossel?: Tables<'post_carrosseis'> & { imagens: Tables<'carrossel_imagens'>[] };
   });
   story?: Tables<'stories'>;
+  automacoes?: Tables<'automacoes'>;
 };
 
 export const ConteudoService = {
@@ -47,9 +48,10 @@ export const ConteudoService = {
 
     const ids = conteudos.map((c) => c.id);
 
-    const [{ data: posts }, { data: stories }] = await Promise.all([
+    const [{ data: posts }, { data: stories }, { data: automacoes }] = await Promise.all([
       api.from("posts").select("*").in("conteudo_id", ids),
       api.from("stories").select("*").in("conteudo_id", ids),
+      api.from("automacoes").select("*").in("conteudo_id", ids),
     ]);
 
     const postIds = posts?.map((p) => p.id) ?? [];
@@ -77,6 +79,7 @@ export const ConteudoService = {
     return conteudos.map((c) => {
       const post = posts?.find((p) => p.conteudo_id === c.id);
       const story = stories?.find((s) => s.conteudo_id === c.id);
+      const automacao = automacoes?.find((a) => a.conteudo_id === c.id);
       let postFull;
       if (post) {
         const video = videos?.find((v) => v.post_id === post.id);
@@ -94,7 +97,7 @@ export const ConteudoService = {
             : undefined,
         };
       }
-      return { ...c, post: postFull, story } as ConteudoCompleto;
+      return { ...c, post: postFull, story, automacoes: automacao } as ConteudoCompleto;
     });
   },
 
@@ -128,7 +131,7 @@ export const ConteudoService = {
     conteudoId?: string;
     semanaId: string;
     calendarioId: string;
-    tipo: 'post' | 'story';
+    tipo: 'post' | 'story' | 'automacoes';
     status: Tables<'conteudos'>['status'];
     data_publicacao?: string | null;
     dia_semana?: number | null;
@@ -141,9 +144,10 @@ export const ConteudoService = {
       carrossel?: { ideia: string; imagens: string[] };
     };
     story?: { texto: string };
+    automacoes?: { titulo: string; texto: string };
     oldConteudo?: ConteudoCompleto;
   }) {
-    const { isEdit, conteudoId, semanaId, calendarioId, tipo, status, data_publicacao, dia_semana, post, story, oldConteudo } = payload;
+    const { isEdit, conteudoId, semanaId, calendarioId, tipo, status, data_publicacao, dia_semana, post, story, automacoes, oldConteudo } = payload;
 
     const conteudoPayload: any = {
       semana_id: semanaId,
@@ -184,6 +188,9 @@ export const ConteudoService = {
       }
       if (oldConteudo.story) {
         await api.from("stories").delete().eq("id", oldConteudo.story.id);
+      }
+      if (oldConteudo.automacoes) {
+        await api.from("automacoes").delete().eq("id", oldConteudo.automacoes.id);
       }
     } else {
       const { data, error } = await api.from("conteudos").insert(conteudoPayload).select().single();
@@ -226,6 +233,12 @@ export const ConteudoService = {
       }
     } else if (tipo === "story" && story) {
       await api.from("stories").insert({ conteudo_id: finalConteudoId, texto: story.texto });
+    } else if (tipo === "automacoes" && automacoes) {
+      await api.from("automacoes").insert({ 
+        conteudo_id: finalConteudoId, 
+        titulo: automacoes.titulo, 
+        texto: automacoes.texto 
+      });
     }
 
     return finalConteudoId;
