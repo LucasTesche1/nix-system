@@ -18,6 +18,7 @@ import { Loader2, Plus, X, MessageCircle } from "lucide-react";
 import { useConteudos } from "@/hooks/useConteudos";
 import { useCalendarios } from "@/hooks/useCalendarios";
 import { ConteudoCompleto } from "@/services/conteudo.service";
+import { PreservedText } from "@/components/ui/PreservedText";
 
 interface Props {
   open: boolean;
@@ -188,9 +189,10 @@ export const ContentForm = ({ open, onOpenChange, semanaId, calendarioId, conteu
                     <MessageCircle className="h-3.5 w-3.5" />
                     Comentário do Cliente
                   </div>
-                  <p className="text-sm text-foreground/90 leading-relaxed italic">
-                    "{conteudo.comentario_cliente}"
-                  </p>
+                  <PreservedText 
+                    text={conteudo.comentario_cliente} 
+                    className="text-sm text-foreground/90 leading-relaxed italic" 
+                  />
                 </div>
               )}
               <div className="grid grid-cols-2 gap-3">
@@ -301,9 +303,10 @@ export const ContentForm = ({ open, onOpenChange, semanaId, calendarioId, conteu
                     <MessageCircle className="h-3.5 w-3.5" />
                     Comentário do Cliente
                   </div>
-                  <p className="text-sm text-foreground/90 leading-relaxed italic">
-                    "{conteudo.comentario_cliente}"
-                  </p>
+                  <PreservedText 
+                    text={conteudo.comentario_cliente} 
+                    className="text-sm text-foreground/90 leading-relaxed italic" 
+                  />
                 </div>
               )}
               <div>
@@ -332,9 +335,10 @@ export const ContentForm = ({ open, onOpenChange, semanaId, calendarioId, conteu
                     <MessageCircle className="h-3.5 w-3.5" />
                     Comentário do Cliente
                   </div>
-                  <p className="text-sm text-foreground/90 leading-relaxed italic">
-                    "{conteudo.comentario_cliente}"
-                  </p>
+                  <PreservedText 
+                    text={conteudo.comentario_cliente} 
+                    className="text-sm text-foreground/90 leading-relaxed italic" 
+                  />
                 </div>
               )}
               <div>

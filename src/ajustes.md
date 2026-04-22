@@ -1,191 +1,165 @@
-
 ## 📄 Contexto
 
-O sistema atualmente suporta dois tipos de conteúdo: `post` e `story`. A Profissional
-precisa incluir automações de fluxo (ex: sequências de mensagens, respostas automáticas)
-no calendário de conteúdo, de forma que o cliente também possa revisar, aprovar ou
-reprovar esse tipo de entrega.
+Campos de texto do sistema (ex: `fluxo` de automações, `legenda` de posts,
+`gancho`, `desenvolvimento`, `cta` de vídeos) podem conter quebras de linha
+representadas pelo caractere `\n`.
 
-Como automações são uma entidade distinta de posts e stories — com campos próprios
-e sem relação com formatos de mídia — elas devem ser tratadas como um novo tipo
-de conteúdo dentro do sistema.
+O comportamento padrão do HTML ignora esses caracteres e colapsa o conteúdo
+em uma única linha contínua, tornando o texto ilegível quando a formatação
+original é relevante para o entendimento do conteúdo.
 
-**Impacto:** Sem esse tipo, a Profissional é obrigada a gerenciar automações fora
-do sistema, quebrando o fluxo centralizado de aprovação e perdendo o histórico
-de validação pelo cliente.
+**Exemplo do problema:**
+
+```
+Texto salvo no banco:
+"Olá, tudo bem?\nClique no link abaixo:\nhttps://..."
+
+Texto renderizado no browser:
+"Olá, tudo bem? Clique no link abaixo: https://..."
+```
+
+**Impacto:** A Profissional e o cliente visualizam textos sem formatação, o que
+compromete a leitura de roteiros, fluxos de automação e legendas que dependem
+de estrutura visual para fazer sentido.
 
 ---
 
 ## 🎯 Objetivo
 
-Adicionar `automacao` como terceiro tipo válido de conteúdo, composto por `titulo`
-e `fluxo` (texto livre), participando do mesmo ciclo de aprovação já existente
-para posts e stories.
+Garantir que todos os campos de texto do sistema que possam conter `\n` sejam
+renderizados preservando as quebras de linha e espaços originais, de forma
+responsiva e sem quebrar o layout.
 
 ---
 
 ## 🧩 Escopo
 
-- Adicionar `'automacao'` ao CHECK constraint do campo `tipo` na tabela `conteudos`
-- Executar migração para criação da tabela `automacoes` conforme schema fornecido
-- Adicionar coluna `titulo` à tabela `automacoes`
-- Implementar criação, edição e exibição de automações na interface da Profissional
-- Exibir automações na interface do cliente para aprovação/reprovação e comentário
-- Integrar ao service e composables existentes seguindo a arquitetura do projeto
+- Identificar todos os campos de texto longo renderizados no frontend
+- Aplicar a correção de renderização nesses campos
+- Garantir que a solução seja responsiva (sem overflow horizontal)
+
+**Campos afetados (mapeamento inicial):**
+
+| Tabela        | Campo            |
+|---------------|------------------|
+| `post_videos` | `gancho`         |
+| `post_videos` | `desenvolvimento`|
+| `post_videos` | `cta`            |
+| `posts`       | `legenda`        |
+| `automacoes`  | `texto` (fluxo)  |
+| `stories`     | `texto`          |
+| `conteudos`   | `comentario_cliente` |
 
 ---
 
 ## 🚫 Fora do Escopo
 
-- Execução ou integração real com ferramentas de automação externas
-- Preview de fluxo em formato visual (ex: diagrama de nós)
-- Versionamento diferenciado de automações em relação aos demais conteúdos
-- Exportação de automações no PDF (escopo do PDF atual cobre apenas vídeos)
+- Suporte a Markdown ou HTML dentro dos campos de texto
+- Editor rico (rich text) de criação/edição de conteúdo
+- Sanitização de HTML em campos de entrada
+- Alteração de schema ou dados no banco
 
 ---
 
 ## ⚙️ Requisitos Técnicos
 
-### Alterações no Banco
+### Solução
 
-**1. Atualizar CHECK constraint em `conteudos.tipo`:**
+Aplicar a classe utilitária do Tailwind `whitespace-pre-wrap` nos elementos
+que renderizam esses campos:
 
-```sql
-ALTER TABLE conteudos
-DROP CONSTRAINT conteudos_tipo_check;
-
-ALTER TABLE conteudos
-ADD CONSTRAINT conteudos_tipo_check
-CHECK (tipo IN ('post', 'story', 'automacoes'));
+```tsx
+<p className="whitespace-pre-wrap break-words">
+  {conteudo.texto}
+</p>
 ```
 
-**2. Criar tabela `automacoes` conforme schema fornecido + coluna `titulo`:**
+**Por que `whitespace-pre-wrap`:**
+- Preserva `\n` e espaços múltiplos
+- Faz wrap automático ao atingir o limite do container (responsivo)
+- Não exige manipulação de string no JS
 
-```sql
-CREATE TABLE public.automacoes (
-  id          UUID NOT NULL DEFAULT gen_random_uuid(),
-  conteudo_id UUID UNIQUE REFERENCES conteudos(id),
-  titulo      TEXT NOT NULL,
-  texto       TEXT NOT NULL,
+**Por que `break-words`:**
+- Evita overflow horizontal em palavras longas sem espaço (ex: URLs)
 
-  CONSTRAINT automacoes_pkey PRIMARY KEY (id)
-);
+### O que NÃO fazer
+
+```tsx
+// ❌ Não usar — ignora quebras de linha
+<p>{texto}</p>
+
+// ❌ Não usar — risco de XSS se o conteúdo vier do usuário
+<p dangerouslySetInnerHTML={{ __html: texto.replace(/\n/g, '<br/>') }} />
+
+// ❌ Não usar — whitespace-pre quebra responsividade (sem wrap)
+<p className="whitespace-pre">{texto}</p>
 ```
 
-> O campo `fluxo` descrito na spec será persistido na coluna `texto` conforme
-> o schema fornecido. O alias "fluxo" deve ser usado apenas na camada de UI/UX.
+### Componente Reutilizável (recomendado)
 
----
+Criar um componente utilitário para centralizar a solução e evitar
+inconsistências futuras:
 
-### Campos da Entidade
+```tsx
+// src/components/ui/PreservedText.tsx
 
-| Campo        | Coluna no banco | Obrigatório | Descrição                        |
-|--------------|-----------------|-------------|----------------------------------|
-| Título       | `titulo`        | Sim         | Nome da automação                |
-| Fluxo        | `texto`         | Sim         | Descrição textual do fluxo       |
-| conteudo_id  | `conteudo_id`   | Sim         | Referência ao conteúdo base      |
+interface PreservedTextProps {
+  text: string
+  className?: string
+}
 
----
+export function PreservedText({ text, className }: PreservedTextProps) {
+  return (
+    <p className={`whitespace-pre-wrap break-words ${className ?? ''}`}>
+      {text}
+    </p>
+  )
+}
+```
 
-### Criação de Automação (Profissional)
-
-Ao criar um conteúdo do tipo `automacao`, o service deve:
-
-1. Inserir na tabela `conteudos` com `tipo = 'automacao'`
-2. Inserir na tabela `automacoes` com `titulo` e `texto` vinculados ao `conteudo_id`
-
-Ambas as operações devem ocorrer de forma atômica (sequencial com rollback em caso
-de falha na segunda inserção).
-
-### Edição de Automação (Profissional)
-
-- Permite editar `titulo` e `texto` em `automacoes`
-- Permite editar campos base em `conteudos` (`data_publicacao`, `semana_id`, etc.)
-- Se o conteúdo estiver com `status = 'approved'` ao ser editado:
-  - `status` volta para `pending_review` (comportamento já existente via trigger)
-  - `version` é incrementado automaticamente
-
-### Validação pelo Cliente
-
-- O cliente visualiza automações junto aos demais conteúdos do calendário
-- Pode alterar `status`: `pending_review` → `approved` ou `rejected`
-- Pode adicionar `comentario_cliente` (opcional)
-- Não pode editar `titulo` nem `texto`
+Substituir todas as ocorrências de renderização dos campos afetados pelo
+componente `<PreservedText />`.
 
 ---
 
 ## 🗄️ Impacto em Dados
 
-**Tabelas afetadas:**
+Nenhuma alteração de schema ou dados necessária.
 
-| Tabela       | Tipo de alteração                                              |
-|--------------|----------------------------------------------------------------|
-| `conteudos`  | Atualização do CHECK constraint para incluir `'automacao'`    |
-| `automacoes` | Criação da tabela (schema fornecido + coluna `titulo`)        |
-
-**Método a implementar em `conteudos.service.ts` (ou `automacoes.service.ts`):**
-
-- `criarAutomacao({ conteudo, automacao })` → insere em `conteudos` + `automacoes`
-- `atualizarAutomacao({ conteudo_id, titulo, texto })` → atualiza `automacoes`
-- `buscarAutomacaoPorConteudo(conteudo_id)` → retorna dados completos com join
+O problema é exclusivamente de renderização no frontend.
 
 ---
 
 ## 🔐 Segurança
 
-- A tabela `automacoes` deve ter política RLS equivalente às demais tabelas filhas
-  (`posts`, `stories`), herdando o controle via `conteudo_id → calendario_id → cliente_id`
-- O cliente não pode escrever em `automacoes` diretamente — apenas em `status` e
-  `comentario_cliente` via `conteudos`
-
-**Política RLS sugerida:**
-
-```sql
-CREATE POLICY "Owner access automacoes"
-ON automacoes
-FOR ALL
-USING (
-  EXISTS (
-    SELECT 1
-    FROM conteudos co
-    JOIN calendarios c ON c.id = co.calendario_id
-    WHERE co.id = automacoes.conteudo_id
-      AND is_owner(c.cliente_id)
-  )
-)
-WITH CHECK (TRUE);
-```
+- A solução via CSS (`whitespace-pre-wrap`) **não interpreta HTML**, eliminando
+  qualquer risco de XSS
+- Não utilizar `dangerouslySetInnerHTML` como solução alternativa
 
 ---
 
 ## 🧪 Critérios de Aceite
 
-- [ ] A Profissional consegue criar um conteúdo do tipo `automacao` informando
-      `titulo` e `fluxo`
-- [ ] A automação aparece agrupada na semana correta dentro do calendário
-- [ ] A Profissional consegue editar `titulo` e `fluxo` de uma automação existente
-- [ ] Ao editar uma automação com `status = 'approved'`, o status volta para
-      `pending_review` e `version` é incrementado
-- [ ] A automação aparece na interface do cliente junto aos demais conteúdos
-- [ ] O cliente consegue aprovar uma automação
-- [ ] O cliente consegue reprovar uma automação
-- [ ] O cliente consegue deixar um comentário ao aprovar ou reprovar
-- [ ] Automações com `status = 'draft'` **não aparecem** para o cliente
-- [ ] A tabela `automacoes` possui RLS equivalente às demais tabelas filhas
-- [ ] O CHECK constraint de `conteudos.tipo` aceita `'automacao'` sem erro
+- [ ] Textos com `\n` são renderizados com quebra de linha visível na interface
+- [ ] Textos com múltiplos espaços preservam os espaços na renderização
+- [ ] Nenhum campo corrigido causa overflow horizontal no layout
+- [ ] A correção se aplica tanto na interface da Profissional quanto na do cliente
+- [ ] Os seguintes campos renderizam corretamente: `gancho`, `desenvolvimento`,
+      `cta`, `legenda`, `texto` (stories e automações), `comentario_cliente`
+- [ ] O componente `<PreservedText />` é utilizado em todos os campos afetados
+- [ ] Não há uso de `dangerouslySetInnerHTML` como solução
 
 ---
 
 ## 🧠 Observações Técnicas
 
-- **Suposição:** o campo `fluxo` na especificação corresponde à coluna `texto`
-  do schema fornecido — a UI deve exibir o label "Fluxo" mas persistir em `texto`
-- **Suposição:** automações não possuem `deleted_at` próprio — o soft delete é
-  controlado pelo `deleted_at` do `conteudo` pai, seguindo o padrão das demais
-  entidades filhas (`post_videos`, `stories`, etc.)
-- A constraint `UNIQUE` em `conteudo_id` já está no schema fornecido, garantindo
-  relação 1:1 entre `conteudos` e `automacoes`
-- Seguir o fluxo obrigatório: `Page → Composable → Service → api.ts → Supabase`
-- O trigger `trg_conteudos_version` já cobre o incremento de `version` e reset
-  de `status` — nenhuma lógica adicional necessária para esse comportamento
+- A combinação `whitespace-pre-wrap` + `break-words` é a abordagem mais segura
+  e simples — não requer manipulação de string nem dependências externas
+- Criar o componente `<PreservedText />` como padrão do projeto evita que o
+  problema reapareça em novos campos futuros
+- Campos de **input/textarea** de criação e edição não são afetados por este bug —
+  o problema ocorre apenas na renderização de leitura
+- Verificar se há campos afetados dentro de modais de detalhe, cards de listagem
+  e na página de visualização do cliente — os três contextos podem renderizar
+  esses campos de forma independente
 ````

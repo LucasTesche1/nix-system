@@ -14,6 +14,7 @@ import { useCalendarios } from "@/hooks/useCalendarios";
 import { useConteudos } from "@/hooks/useConteudos";
 import { ConteudoCompleto } from "@/services/conteudo.service";
 import { cn } from "@/lib/utils";
+import { PreservedText } from "@/components/ui/PreservedText";
 
 const CalendarioEditor = () => {
   const { id = "" } = useParams<{ id: string }>();
@@ -350,17 +351,20 @@ const CalendarioEditor = () => {
                           </Button>
                         </div>
                       </div>
-                      <p className="line-clamp-2 text-sm">
-                        {c.tipo === "story"
-                          ? c.story?.texto
-                          : c.tipo === "automacoes"
-                          ? `${c.automacoes?.titulo}: ${c.automacoes?.texto}`
-                          : (c.post as any)?.formato === "video"
-                          ? (c.post as any)?.video?.gancho
-                          : (c.post as any)?.formato === "estatico"
-                          ? (c.post as any)?.estatico?.ideia
-                          : (c.post as any)?.carrossel?.ideia}
-                      </p>
+                      <PreservedText 
+                        text={
+                          c.tipo === "story"
+                            ? c.story?.texto ?? ""
+                            : c.tipo === "automacoes"
+                            ? `${c.automacoes?.titulo}: ${c.automacoes?.texto}`
+                            : (c.post as any)?.formato === "video"
+                            ? (c.post as any)?.video?.gancho
+                            : (c.post as any)?.formato === "estatico"
+                            ? (c.post as any)?.estatico?.ideia
+                            : (c.post as any)?.carrossel?.ideia
+                        }
+                        className="line-clamp-2 text-sm"
+                      />
                     </div>
                   ))}
                 </div>
