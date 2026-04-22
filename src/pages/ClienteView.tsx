@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { MESES, DIAS_SEMANA } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
+import { PreservedText } from "@/components/ui/PreservedText";
 
 const ClienteView = () => {
   const { token = "" } = useParams<{ token: string }>();
@@ -177,9 +178,10 @@ const ClienteView = () => {
 
                     <div className="space-y-4 p-4 sm:p-5">
                       {c.tipo === "story" && (
-                        <p className="whitespace-pre-wrap text-[15px] leading-relaxed">
-                          {c.story?.texto}
-                        </p>
+                        <PreservedText 
+                          text={c.story?.texto ?? ""} 
+                          className="text-[15px] leading-relaxed" 
+                        />
                       )}
 
                       {c.tipo === "automacoes" && (
@@ -274,7 +276,7 @@ const ClienteView = () => {
                             <MessageCircle className="h-3.5 w-3.5" /> 
                             {c.status === "rejected" ? "Ajustes solicitados" : "Comentário da aprovação"}
                           </div>
-                          {c.comentario_cliente}
+                          <PreservedText text={c.comentario_cliente} />
                         </div>
                       )}
                     </div>
@@ -294,7 +296,7 @@ const Field = ({ label, value }: { label: string; value: string }) => (
     <div className="mb-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80">
       {label}
     </div>
-    <div className="text-[15px] leading-relaxed">{value}</div>
+    <PreservedText text={value} className="text-[15px] leading-relaxed" />
   </div>
 );
 
