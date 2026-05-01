@@ -92,6 +92,20 @@ export const useCalendarios = () => {
     },
   });
 
+  const registrarAcesso = useMutation({
+    mutationFn: (id: string) => CalendarioService.registrarAcesso(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["calendarios"] });
+    },
+  });
+
+  const exportarPDF = useMutation({
+    mutationFn: (id: string) => CalendarioService.buscarDadosExportacao(id),
+    onError: (error: Error) => {
+      toast.error("Erro ao buscar dados para exportação: " + error.message);
+    },
+  });
+
   return {
     useCalendariosList,
     useCalendario,
@@ -102,5 +116,7 @@ export const useCalendarios = () => {
     useClientes,
     createCalendario,
     ativarCalendario,
+    registrarAcesso,
+    exportarPDF,
   };
 };

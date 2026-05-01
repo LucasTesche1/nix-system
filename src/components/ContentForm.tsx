@@ -18,6 +18,7 @@ import { Loader2, Plus, X, MessageCircle } from "lucide-react";
 import { useConteudos } from "@/hooks/useConteudos";
 import { useCalendarios } from "@/hooks/useCalendarios";
 import { ConteudoCompleto } from "@/services/conteudo.service";
+import { PreservedText } from "@/components/ui/PreservedText";
 
 interface Props {
   open: boolean;
@@ -52,6 +53,9 @@ export const ContentForm = ({ open, onOpenChange, semanaId, calendarioId, conteu
   const [imagens, setImagens] = useState<string[]>([""]);
   // story
   const [storyTexto, setStoryTexto] = useState("");
+  // automacao
+  const [automacaoTitulo, setAutomacaoTitulo] = useState("");
+  const [automacaoTexto, setAutomacaoTexto] = useState("");
   // status
   const [status, setStatus] = useState<ContentStatus>("draft");
 
@@ -90,10 +94,15 @@ export const ContentForm = ({ open, onOpenChange, semanaId, calendarioId, conteu
         }
       }
       if (conteudo.story) setStoryTexto(conteudo.story.texto);
+      if (conteudo.automacoes) {
+        setAutomacaoTitulo(conteudo.automacoes.titulo);
+        setAutomacaoTexto(conteudo.automacoes.texto);
+      }
     } else {
       setTipo("post"); setFormato("video"); setDataPub(""); setDiaSemana(1);
       setLegenda(""); setLinkDrive(""); setGancho(""); setDesenvolvimento(""); setCta("");
       setIdeia(""); setImagem(""); setCarrIdeia(""); setImagens([""]); setStoryTexto("");
+      setAutomacaoTitulo(""); setAutomacaoTexto("");
       setStatus("draft");
     }
   }, [open, conteudo]);
@@ -108,9 +117,12 @@ export const ContentForm = ({ open, onOpenChange, semanaId, calendarioId, conteu
         return "Estático: ideia e imagem são obrigatórios";
       if (formato === "carrossel" && (!carrIdeia || imagens.filter((i) => i.trim()).length === 0))
         return "Carrossel: ideia e ao menos 1 imagem";
-    } else {
+    } else if (tipo === "story") {
       if (!storyTexto.trim()) return "Texto do story obrigatório";
       if (diaSemana < 0 || diaSemana > 6) return "Dia da semana inválido";
+    } else if (tipo === "automacoes") {
+      if (!automacaoTitulo.trim()) return "Título da automação obrigatório";
+      if (!automacaoTexto.trim()) return "Fluxo da automação obrigatório";
     }
     return null;
   };
@@ -139,8 +151,10 @@ export const ContentForm = ({ open, onOpenChange, semanaId, calendarioId, conteu
         estatico: formato === "estatico" ? { ideia, imagem_url: imagem } : undefined,
         carrossel: formato === "carrossel" ? { ideia: carrIdeia, imagens } : undefined,
       };
-    } else {
+    } else if (tipo === "story") {
       payload.story = { texto: storyTexto };
+    } else if (tipo === "automacoes") {
+      payload.automacoes = { titulo: automacaoTitulo, texto: automacaoTexto };
     }
 
     saveConteudo.mutate(payload, {
@@ -159,9 +173,10 @@ export const ContentForm = ({ open, onOpenChange, semanaId, calendarioId, conteu
         </DialogHeader>
 
         <Tabs value={tipo} onValueChange={(v) => setTipo(v as ContentType)}>
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="post">Post</TabsTrigger>
             <TabsTrigger value="story">Story</TabsTrigger>
+            <TabsTrigger value="automacoes">Automação</TabsTrigger>
           </TabsList>
         </Tabs>
 
@@ -174,9 +189,10 @@ export const ContentForm = ({ open, onOpenChange, semanaId, calendarioId, conteu
                     <MessageCircle className="h-3.5 w-3.5" />
                     Comentário do Cliente
                   </div>
-                  <p className="text-sm text-foreground/90 leading-relaxed italic">
-                    "{conteudo.comentario_cliente}"
-                  </p>
+                  <PreservedText 
+                    text={conteudo.comentario_cliente} 
+                    className="text-sm text-foreground/90 leading-relaxed italic" 
+                  />
                 </div>
               )}
               <div className="grid grid-cols-2 gap-3">
@@ -279,7 +295,7 @@ export const ContentForm = ({ open, onOpenChange, semanaId, calendarioId, conteu
                 <Input value={linkDrive} onChange={(e) => setLinkDrive(e.target.value)} className="mt-1.5" />
               </div>
             </>
-          ) : (
+          ) : tipo === "story" ? (
             <>
               {conteudo?.comentario_cliente && (
                 <div className="rounded-xl bg-primary/5 border border-primary/10 p-4 mb-4">
@@ -287,9 +303,10 @@ export const ContentForm = ({ open, onOpenChange, semanaId, calendarioId, conteu
                     <MessageCircle className="h-3.5 w-3.5" />
                     Comentário do Cliente
                   </div>
-                  <p className="text-sm text-foreground/90 leading-relaxed italic">
-                    "{conteudo.comentario_cliente}"
-                  </p>
+                  <PreservedText 
+                    text={conteudo.comentario_cliente} 
+                    className="text-sm text-foreground/90 leading-relaxed italic" 
+                  />
                 </div>
               )}
               <div>
@@ -310,20 +327,63 @@ export const ContentForm = ({ open, onOpenChange, semanaId, calendarioId, conteu
                 <Textarea value={storyTexto} onChange={(e) => setStoryTexto(e.target.value)} className="mt-1.5" rows={6} />
               </div>
             </>
+          ) : (
+            <>
+              {conteudo?.comentario_cliente && (
+                <div className="rounded-xl bg-primary/5 border border-primary/10 p-4 mb-4">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-primary mb-2">
+                    <MessageCircle className="h-3.5 w-3.5" />
+                    Comentário do Cliente
+                  </div>
+                  <PreservedText 
+                    text={conteudo.comentario_cliente} 
+                    className="text-sm text-foreground/90 leading-relaxed italic" 
+                  />
+                </div>
+              )}
+              <div>
+                <Label>Título da Automação</Label>
+                <Input 
+                  value={automacaoTitulo} 
+                  onChange={(e) => setAutomacaoTitulo(e.target.value)} 
+                  placeholder="Ex: Sequência de Boas-vindas"
+                  className="mt-1.5" 
+                />
+              </div>
+              <div>
+                <Label>Fluxo</Label>
+                <Textarea 
+                  value={automacaoTexto} 
+                  onChange={(e) => setAutomacaoTexto(e.target.value)} 
+                  placeholder="Descreva o fluxo da automação..."
+                  className="mt-1.5" 
+                  rows={8} 
+                />
+              </div>
+            </>
           )}
 
-          {!isEdit && (
-            <div>
-              <Label>Status inicial</Label>
-              <Select value={status} onValueChange={(v) => setStatus(v as ContentStatus)}>
-                <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="draft">Rascunho (invisível ao cliente)</SelectItem>
-                  <SelectItem value="pending_review">Pendente (enviar para revisão)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          <div>
+            <Label>Status do conteúdo</Label>
+            <Select value={status} onValueChange={(v) => setStatus(v as ContentStatus)}>
+              <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="draft">Rascunho (invisível ao cliente)</SelectItem>
+                <SelectItem value="pending_review">Pendente (enviar para revisão)</SelectItem>
+                {isEdit && status === "approved" && (
+                  <SelectItem value="approved">Aprovado</SelectItem>
+                )}
+                {isEdit && status === "rejected" && (
+                  <SelectItem value="rejected">Recusado pelo cliente</SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+            {isEdit && (status === "approved" || status === "rejected") && (
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Dica: Altere para "Pendente" para reabrir o ciclo de aprovação.
+              </p>
+            )}
+          </div>
         </div>
 
         <div className="flex justify-end gap-3 pt-4">

@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { MESES, DIAS_SEMANA } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
+import { PreservedText } from "@/components/ui/PreservedText";
 
 const ClienteView = () => {
   const { token = "" } = useParams<{ token: string }>();
@@ -156,13 +157,19 @@ const ClienteView = () => {
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 bg-secondary/30 px-4 py-3 sm:px-5">
                       <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
                         <span className="rounded-md bg-background px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                          {c.tipo === "post" ? (c.post as any)?.formato : "Story"}
+                          {c.tipo === "post" 
+                            ? (c.post as any)?.formato 
+                            : c.tipo === "story" 
+                            ? "Story" 
+                            : "Automação"}
                         </span>
                         <span className="truncate text-xs font-medium sm:text-sm">
                           {c.tipo === "post" && c.data_publicacao
                             ? format(parseISO(c.data_publicacao), "EEEE, dd 'de' MMM", { locale: ptBR })
                             : c.tipo === "story" && c.dia_semana !== null
                             ? DIAS_SEMANA[c.dia_semana!]
+                            : c.tipo === "automacoes"
+                            ? c.automacoes?.titulo
                             : ""}
                         </span>
                       </div>
@@ -171,9 +178,16 @@ const ClienteView = () => {
 
                     <div className="space-y-4 p-4 sm:p-5">
                       {c.tipo === "story" && (
-                        <p className="whitespace-pre-wrap text-[15px] leading-relaxed">
-                          {c.story?.texto}
-                        </p>
+                        <PreservedText 
+                          text={c.story?.texto ?? ""} 
+                          className="text-[15px] leading-relaxed" 
+                        />
+                      )}
+
+                      {c.tipo === "automacoes" && (
+                        <div className="space-y-3">
+                          <Field label="Fluxo" value={c.automacoes?.texto ?? ""} />
+                        </div>
                       )}
 
                       {c.tipo === "post" && (c.post as any)?.formato === "video" && (c.post as any).video && (
@@ -262,7 +276,7 @@ const ClienteView = () => {
                             <MessageCircle className="h-3.5 w-3.5" /> 
                             {c.status === "rejected" ? "Ajustes solicitados" : "Comentário da aprovação"}
                           </div>
-                          {c.comentario_cliente}
+                          <PreservedText text={c.comentario_cliente} />
                         </div>
                       )}
                     </div>
@@ -282,7 +296,7 @@ const Field = ({ label, value }: { label: string; value: string }) => (
     <div className="mb-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80">
       {label}
     </div>
-    <div className="text-[15px] leading-relaxed">{value}</div>
+    <PreservedText text={value} className="text-[15px] leading-relaxed" />
   </div>
 );
 

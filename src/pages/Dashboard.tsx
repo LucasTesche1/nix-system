@@ -62,6 +62,12 @@ const Dashboard = () => {
               to={`/calendario/${r.id}`}
               className="group relative overflow-hidden rounded-2xl border border-border bg-card p-6 transition hover:shadow-elevated"
             >
+              {r.tem_atividade && (
+                <div className="absolute right-3 top-3 z-10 flex h-3 w-3">
+                  <span className="absolute inline-flex h-full w-full animate-pulse rounded-full bg-orange-500 opacity-75"></span>
+                  <span className="relative inline-flex h-3 w-3 rounded-full bg-orange-600"></span>
+                </div>
+              )}
               <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-gradient-primary opacity-10 blur-2xl transition group-hover:opacity-20" />
               <div className="relative">
                 <div className="flex items-start justify-between">

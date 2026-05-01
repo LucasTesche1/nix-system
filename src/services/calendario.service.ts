@@ -4,6 +4,7 @@ import { Tables } from "@/integrations/supabase/types";
 export type CalendarioComCliente = Tables<'calendarios'> & {
   cliente: Tables<'clientes'> | null;
   progress?: number;
+  tem_atividade?: boolean;
 };
 
 export const CalendarioService = {
@@ -91,26 +92,76 @@ export const CalendarioService = {
     const { data: cont } = semIds.length
       ? await api
           .from("conteudos")
-          .select("status, semana_id")
+          .select("status, semana_id, updated_at")
           .in("semana_id", semIds)
           .neq("status", "draft")
           .is("deleted_at", null)
       : { data: [] as any[] };
 
     const semToCal = new Map(sem?.map((s) => [s.id, s.calendario_id]));
-    const tally: Record<string, { tot: number; ok: number }> = {};
+    const tally: Record<string, { tot: number; ok: number; hasActivity: boolean }> = {};
     
     cont?.forEach((c) => {
       const cid = semToCal.get(c.semana_id)!;
-      tally[cid] ??= { tot: 0, ok: 0 };
+      const cal = cals.find(cal => cal.id === cid);
+      
+      tally[cid] ??= { tot: 0, ok: 0, hasActivity: false };
       tally[cid].tot++;
       if (c.status === "approved") tally[cid].ok++;
+
+      // Detecção de atividade: status em (approved, rejected) e updated_at > ultimo_acesso
+      if (["approved", "rejected"].includes(c.status)) {
+        const lastAccess = cal?.ultimo_acesso_profissional;
+        const updatedAt = c.updated_at;
+        
+        if (!lastAccess || new Date(updatedAt) > new Date(lastAccess)) {
+          tally[cid].hasActivity = true;
+        }
+      }
     });
 
     return cals.map((c) => ({
       ...c,
       progress: tally[c.id]?.tot ? Math.round((tally[c.id].ok / tally[c.id].tot) * 100) : 0,
+      tem_atividade: tally[c.id]?.hasActivity ?? false,
     }));
+  },
+
+  async registrarAcesso(id: string) {
+    const { error } = await api
+      .from("calendarios")
+      .update({ ultimo_acesso_profissional: new Date().toISOString() })
+      .eq("id", id);
+    if (error) throw error;
+  },
+
+  async buscarDadosExportacao(id: string) {
+    const { data, error } = await api
+      .from("calendarios")
+      .select(`
+        nome, mes, ano,
+        cliente:clientes(nome),
+        semanas:semanas(
+          id, nome, ordem,
+          conteudos:conteudos!conteudos_semana_id_fkey(
+            id, data_publicacao, dia_semana, tipo,
+            post:posts!posts_conteudo_id_fkey(
+              id, legenda, drive_url, formato,
+              post_videos!post_videos_post_id_fkey(gancho, desenvolvimento, cta)
+            )
+          )
+        )
+      `)
+      .eq("id", id)
+      .eq("semanas.conteudos.tipo", "post")
+      .eq("semanas.conteudos.post.formato", "video")
+      .is("deleted_at", null)
+      .is("semanas.deleted_at", null)
+      .is("semanas.conteudos.deleted_at", null)
+      .order("ordem", { foreignTable: "semanas" });
+
+    if (error) throw error;
+    return data?.[0] || null;
   },
 
   async softDelete(id: string) {

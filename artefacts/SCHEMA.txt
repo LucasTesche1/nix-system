@@ -1,0 +1,301 @@
+-- ========================================
+-- 🔌 EXTENSÕES
+-- ========================================
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- ========================================
+-- 🧠 FUNÇÕES GERAIS
+-- ========================================
+
+-- Atualiza updated_at automaticamente
+CREATE OR REPLACE FUNCTION set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Controle de versionamento + reset de status
+CREATE OR REPLACE FUNCTION handle_conteudo_update()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW IS DISTINCT FROM OLD THEN
+    NEW.version = OLD.version + 1;
+
+    IF OLD.status = 'approved' THEN
+      NEW.status = 'pending_review';
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ========================================
+-- 👤 CLIENTES
+-- ========================================
+CREATE TABLE clientes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nome TEXT NOT NULL,
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
+  deleted_at TIMESTAMP
+);
+
+CREATE TRIGGER trg_clientes_updated
+BEFORE UPDATE ON clientes
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+-- ========================================
+-- 📅 CALENDARIOS
+-- ========================================
+CREATE TABLE calendarios (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  cliente_id UUID REFERENCES clientes(id),
+
+  nome TEXT NOT NULL,
+  mes INT NOT NULL CHECK (mes BETWEEN 1 AND 12),
+  ano INT NOT NULL,
+
+  status TEXT NOT NULL CHECK (
+    status IN ('draft', 'active', 'archived')
+  ),
+
+  token_acesso TEXT UNIQUE,
+  token_expiracao TIMESTAMP,
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
+  deleted_at TIMESTAMP
+);
+
+CREATE INDEX idx_calendarios_cliente ON calendarios(cliente_id);
+
+CREATE TRIGGER trg_calendarios_updated
+BEFORE UPDATE ON calendarios
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+-- ========================================
+-- 🗂️ SEMANAS
+-- ========================================
+CREATE TABLE semanas (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  calendario_id UUID REFERENCES calendarios(id),
+
+  nome TEXT,
+  ordem INT NOT NULL,
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
+  deleted_at TIMESTAMP
+);
+
+CREATE INDEX idx_semanas_calendario ON semanas(calendario_id);
+
+CREATE TRIGGER trg_semanas_updated
+BEFORE UPDATE ON semanas
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+-- ========================================
+-- 🧠 CONTEUDOS (BASE)
+-- ========================================
+CREATE TABLE conteudos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  calendario_id UUID REFERENCES calendarios(id),
+  semana_id UUID REFERENCES semanas(id),
+
+  tipo TEXT NOT NULL CHECK (tipo IN ('post', 'story')),
+
+  status TEXT NOT NULL CHECK (
+    status IN ('draft', 'pending_review', 'approved', 'rejected')
+  ),
+
+  data_publicacao DATE,
+  dia_semana INT CHECK (dia_semana BETWEEN 0 AND 6),
+
+  comentario_cliente TEXT,
+
+  version INT DEFAULT 1,
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
+  deleted_at TIMESTAMP
+);
+
+CREATE INDEX idx_conteudos_calendario ON conteudos(calendario_id);
+CREATE INDEX idx_conteudos_status ON conteudos(status);
+
+CREATE TRIGGER trg_conteudos_updated
+BEFORE UPDATE ON conteudos
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER trg_conteudos_version
+BEFORE UPDATE ON conteudos
+FOR EACH ROW
+EXECUTE FUNCTION handle_conteudo_update();
+
+-- ========================================
+-- 📝 POSTS
+-- ========================================
+CREATE TABLE posts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  conteudo_id UUID UNIQUE REFERENCES conteudos(id),
+
+  formato TEXT NOT NULL CHECK (
+    formato IN ('video', 'carrossel', 'estatico')
+  ),
+
+  legenda TEXT,
+  drive_url TEXT,
+
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
+  deleted_at TIMESTAMP
+);
+
+CREATE TRIGGER trg_posts_updated
+BEFORE UPDATE ON posts
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+-- ========================================
+-- 🎥 POST VIDEO
+-- ========================================
+CREATE TABLE post_videos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  post_id UUID UNIQUE REFERENCES posts(id),
+
+  gancho TEXT NOT NULL,
+  desenvolvimento TEXT NOT NULL,
+  cta TEXT NOT NULL
+);
+
+-- ========================================
+-- 🖼️ POST ESTATICO
+-- ========================================
+CREATE TABLE post_estaticos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  post_id UUID UNIQUE REFERENCES posts(id),
+
+  ideia TEXT NOT NULL,
+  imagem_url TEXT NOT NULL
+);
+
+-- ========================================
+-- 📚 POST CARROSSEL
+-- ========================================
+CREATE TABLE post_carrosseis (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  post_id UUID UNIQUE REFERENCES posts(id),
+
+  ideia TEXT NOT NULL
+);
+
+-- ========================================
+-- 🖼️ CARROSSEL IMAGENS
+-- ========================================
+CREATE TABLE carrossel_imagens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  carrossel_id UUID REFERENCES post_carrosseis(id),
+
+  imagem_url TEXT NOT NULL,
+  ordem INT NOT NULL
+);
+
+-- ========================================
+-- 📲 STORIES
+-- ========================================
+CREATE TABLE stories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  conteudo_id UUID UNIQUE REFERENCES conteudos(id),
+
+  texto TEXT NOT NULL
+);
+
+-- ========================================
+-- ⚠️ BOAS PRÁTICAS (RECOMENDADO)
+-- ========================================
+
+-- Evitar conteúdo sem semana
+ALTER TABLE conteudos
+ADD CONSTRAINT fk_conteudo_semana
+FOREIGN KEY (semana_id) REFERENCES semanas(id);
+
+-- Evitar conteúdo sem calendário
+ALTER TABLE conteudos
+ADD CONSTRAINT fk_conteudo_calendario
+FOREIGN KEY (calendario_id) REFERENCES calendarios(id);
+
+
+SELECT table_name, column_name, data_type, is_nullable
+FROM information_schema.columns
+WHERE table_schema='public'
+  AND table_name IN ('clientes','calendarios','semanas','conteudos','posts','post_videos','post_estaticos','post_carrosseis','carrossel_imagens','stories')
+ORDER BY table_name, ordinal_position;
+
+
+
+ALTER TABLE clientes
+ADD COLUMN owner_id UUID REFERENCES auth.users(id);
+
+
+CREATE FUNCTION is_owner(cliente_id uuid)
+RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM clientes
+    WHERE id = cliente_id
+      AND owner_id = auth.uid()
+  );
+$$ LANGUAGE sql STABLE;
+
+CREATE POLICY "Owner full access clientes"
+ON clientes
+FOR ALL
+USING (owner_id = auth.uid())
+WITH CHECK (owner_id = auth.uid());
+
+CREATE POLICY "Owner access calendarios"
+ON calendarios
+FOR ALL
+USING (is_owner(cliente_id))
+WITH CHECK (is_owner(cliente_id));
+
+CREATE POLICY "Owner access semanas"
+ON semanas
+FOR ALL
+USING (
+  EXISTS (
+    SELECT 1 FROM calendarios c
+    WHERE c.id = semanas.calendario_id
+      AND is_owner(c.cliente_id)
+  )
+)
+WITH CHECK (TRUE);
+
+CREATE POLICY "Owner access conteudos"
+ON conteudos
+FOR ALL
+USING (
+  EXISTS (
+    SELECT 1 FROM calendarios c
+    WHERE c.id = conteudos.calendario_id
+      AND is_owner(c.cliente_id)
+  )
+)
+WITH CHECK (TRUE);

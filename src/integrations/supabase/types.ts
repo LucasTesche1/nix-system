@@ -19,6 +19,7 @@ export interface Database {
           status: 'draft' | 'active' | 'archived'
           token_acesso: string | null
           token_expiracao: string | null
+          ultimo_acesso_profissional: string | null
           created_at: string
           deleted_at: string | null
         }
@@ -31,6 +32,7 @@ export interface Database {
           status?: 'draft' | 'active' | 'archived'
           token_acesso?: string | null
           token_expiracao?: string | null
+          ultimo_acesso_profissional?: string | null
           created_at?: string
           deleted_at?: string | null
         }
@@ -43,6 +45,7 @@ export interface Database {
           status?: 'draft' | 'active' | 'archived'
           token_acesso?: string | null
           token_expiracao?: string | null
+          ultimo_acesso_profissional?: string | null
           created_at?: string
           deleted_at?: string | null
         }
@@ -97,7 +100,7 @@ export interface Database {
         Row: {
           id: string
           semana_id: string
-          tipo: 'post' | 'story'
+          tipo: 'post' | 'story' | 'automacoes'
           status: 'draft' | 'pending_review' | 'approved' | 'rejected'
           version: number
           data_publicacao: string | null
@@ -110,7 +113,7 @@ export interface Database {
         Insert: {
           id?: string
           semana_id: string
-          tipo: 'post' | 'story'
+          tipo: 'post' | 'story' | 'automacoes'
           status?: 'draft' | 'pending_review' | 'approved' | 'rejected'
           version?: number
           data_publicacao?: string | null
@@ -123,7 +126,7 @@ export interface Database {
         Update: {
           id?: string
           semana_id?: string
-          tipo?: 'post' | 'story'
+          tipo?: 'post' | 'story' | 'automacoes'
           status?: 'draft' | 'pending_review' | 'approved' | 'rejected'
           version?: number
           data_publicacao?: string | null
@@ -268,6 +271,29 @@ export interface Database {
         Update: {
           id?: string
           conteudo_id?: string
+          texto?: string
+          created_at?: string
+        }
+      }
+      automacoes: {
+        Row: {
+          id: string
+          conteudo_id: string
+          titulo: string
+          texto: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          conteudo_id: string
+          titulo: string
+          texto: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          conteudo_id?: string
+          titulo?: string
           texto?: string
           created_at?: string
         }
