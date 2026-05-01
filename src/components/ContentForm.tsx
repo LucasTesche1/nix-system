@@ -363,18 +363,27 @@ export const ContentForm = ({ open, onOpenChange, semanaId, calendarioId, conteu
             </>
           )}
 
-          {!isEdit && (
-            <div>
-              <Label>Status inicial</Label>
-              <Select value={status} onValueChange={(v) => setStatus(v as ContentStatus)}>
-                <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="draft">Rascunho (invisível ao cliente)</SelectItem>
-                  <SelectItem value="pending_review">Pendente (enviar para revisão)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          <div>
+            <Label>Status do conteúdo</Label>
+            <Select value={status} onValueChange={(v) => setStatus(v as ContentStatus)}>
+              <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="draft">Rascunho (invisível ao cliente)</SelectItem>
+                <SelectItem value="pending_review">Pendente (enviar para revisão)</SelectItem>
+                {isEdit && status === "approved" && (
+                  <SelectItem value="approved">Aprovado</SelectItem>
+                )}
+                {isEdit && status === "rejected" && (
+                  <SelectItem value="rejected">Recusado pelo cliente</SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+            {isEdit && (status === "approved" || status === "rejected") && (
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Dica: Altere para "Pendente" para reabrir o ciclo de aprovação.
+              </p>
+            )}
+          </div>
         </div>
 
         <div className="flex justify-end gap-3 pt-4">
