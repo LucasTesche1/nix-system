@@ -82,11 +82,11 @@ const ClienteView = () => {
 
   if (calError || !cal) {
     const errorMsg = calError instanceof Error ? calError.message : "Link inválido";
-    const subMsg = errorMsg === "Link expirado" 
+    const subMsg = errorMsg === "Link expirado"
       ? "Este link de visualização expirou. Solicite um novo link."
       : errorMsg === "Calendário ainda não está ativo"
-      ? "Este calendário está sendo preparado e ainda não foi liberado para visualização."
-      : "Calendário não encontrado ou link inválido.";
+        ? "Este calendário está sendo preparado e ainda não foi liberado para visualização."
+        : "Calendário não encontrado ou link inválido.";
 
     return (
       <div className="flex min-h-screen items-center justify-center bg-background bg-mesh">
@@ -157,20 +157,20 @@ const ClienteView = () => {
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 bg-secondary/30 px-4 py-3 sm:px-5">
                       <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
                         <span className="rounded-md bg-background px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                          {c.tipo === "post" 
-                            ? (c.post as any)?.formato 
-                            : c.tipo === "story" 
-                            ? "Story" 
-                            : "Automação"}
+                          {c.tipo === "post"
+                            ? (c.post as any)?.formato
+                            : c.tipo === "story"
+                              ? "Story"
+                              : "Automação"}
                         </span>
                         <span className="truncate text-xs font-medium sm:text-sm">
                           {c.tipo === "post" && c.data_publicacao
                             ? format(parseISO(c.data_publicacao), "EEEE, dd 'de' MMM", { locale: ptBR })
                             : c.tipo === "story" && c.dia_semana !== null
-                            ? DIAS_SEMANA[c.dia_semana!]
-                            : c.tipo === "automacoes"
-                            ? c.automacoes?.titulo
-                            : ""}
+                              ? DIAS_SEMANA[c.dia_semana!]
+                              : c.tipo === "automacoes"
+                                ? c.automacoes?.titulo
+                                : ""}
                         </span>
                       </div>
                       <StatusBadge status={c.status} />
@@ -178,9 +178,9 @@ const ClienteView = () => {
 
                     <div className="space-y-4 p-4 sm:p-5">
                       {c.tipo === "story" && (
-                        <PreservedText 
-                          text={c.story?.texto ?? ""} 
-                          className="text-[15px] leading-relaxed" 
+                        <PreservedText
+                          text={c.story?.texto ?? ""}
+                          className="text-[15px] leading-relaxed"
                         />
                       )}
 
@@ -202,7 +202,17 @@ const ClienteView = () => {
                         <div className="space-y-3">
                           <Field label="Ideia" value={(c.post as any).estatico.ideia} />
                           {(c.post as any).estatico.imagem_url && (
-                            <img src={(c.post as any).estatico.imagem_url} alt="" className="w-full rounded-lg border border-border" />
+                            <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm">
+                              Link da mídia:{" "}
+                              <a
+                                href={(c.post as any).estatico.imagem_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 underline hover:text-blue-800 transition-colors"
+                              >
+                                Clique aqui
+                              </a>
+                            </div>
                           )}
                         </div>
                       )}
@@ -211,14 +221,19 @@ const ClienteView = () => {
                         <div className="space-y-3">
                           <Field label="Ideia" value={(c.post as any).carrossel.ideia} />
                           {(c.post as any).carrossel.imagens.length > 0 && (
-                            <div className="flex gap-2 overflow-x-auto pb-2">
-                              {(c.post as any).carrossel.imagens.map((im: any) => (
-                                <img
-                                  key={im.id}
-                                  src={im.imagem_url}
-                                  alt=""
-                                  className="h-32 w-32 flex-none rounded-lg border border-border object-cover"
-                                />
+                            <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 space-y-2">
+                              {(c.post as any).carrossel.imagens.map((im: any, index: number) => (
+                                <div key={im.id} className="text-sm">
+                                  Link da mídia {index + 1}:{" "}
+                                  <a
+                                    href={im.imagem_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 underline hover:text-blue-800 transition-colors"
+                                  >
+                                    Clique aqui
+                                  </a>
+                                </div>
                               ))}
                             </div>
                           )}
@@ -242,7 +257,7 @@ const ClienteView = () => {
                               className="min-h-[80px] rounded-xl bg-secondary/20 focus:bg-background transition-colors"
                             />
                           </div>
-                          
+
                           <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
                             <Button
                               className="flex-1 bg-green-600 hover:bg-green-700 text-white shadow-sm"
@@ -268,12 +283,12 @@ const ClienteView = () => {
                       {c.comentario_cliente && c.status !== "pending_review" && (
                         <div className={cn(
                           "mt-4 rounded-xl p-4 text-sm border transition-colors",
-                          c.status === "rejected" 
-                            ? "bg-red-50 text-red-800 border-red-100" 
+                          c.status === "rejected"
+                            ? "bg-red-50 text-red-800 border-red-100"
                             : "bg-emerald-50 text-emerald-800 border-emerald-100"
                         )}>
                           <div className="flex items-center gap-2 font-bold mb-1">
-                            <MessageCircle className="h-3.5 w-3.5" /> 
+                            <MessageCircle className="h-3.5 w-3.5" />
                             {c.status === "rejected" ? "Ajustes solicitados" : "Comentário da aprovação"}
                           </div>
                           <PreservedText text={c.comentario_cliente} />
