@@ -195,6 +195,19 @@ const ClienteView = () => {
                           <Field label="Gancho" value={(c.post as any).video.gancho} />
                           <Field label="Desenvolvimento" value={(c.post as any).video.desenvolvimento} />
                           <Field label="CTA" value={(c.post as any).video.cta} />
+                          {(c.post as any).drive_url && (
+                            <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm">
+                              Link da mídia:{" "}
+                              <a
+                                href={(c.post as any).drive_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 underline hover:text-blue-800 transition-colors"
+                              >
+                                Clique aqui
+                              </a>
+                            </div>
+                          )}
                         </div>
                       )}
 
