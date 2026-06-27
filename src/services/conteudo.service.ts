@@ -239,6 +239,22 @@ export const ConteudoService = {
       });
     }
 
+    // O banco ainda possui um trigger que força `pending_review` quando o status
+    // antigo era `approved`. Por isso, só reaplicamos o status escolhido quando
+    // a edição partiu de `approved`; nos demais casos, uma segunda atualização
+    // criaria o efeito colateral de voltar para `pending_review`.
+    if (isEdit && oldConteudo?.status === "approved" && status !== "pending_review") {
+      const { error } = await api
+        .from("conteudos")
+        .update({
+          status,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", finalConteudoId);
+
+      if (error) throw error;
+    }
+
     return finalConteudoId;
   }
 };
