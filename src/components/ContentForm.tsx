@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  ContentType, PostFormat, ContentStatus,
+  ContentType, PostFormat, ContentStatus, isApprovedLikeStatus,
 } from "@/lib/types";
 import { toast } from "sonner";
 import { Loader2, Plus, X, MessageCircle } from "lucide-react";
@@ -167,7 +167,7 @@ export const ContentForm = ({ open, onOpenChange, semanaId, calendarioId, conteu
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar conteúdo" : "Novo conteúdo"}</DialogTitle>
         </DialogHeader>
@@ -202,13 +202,13 @@ export const ContentForm = ({ open, onOpenChange, semanaId, calendarioId, conteu
                     type="date"
                     value={dataPub}
                     onChange={(e) => setDataPub(e.target.value)}
-                    className="mt-1.5"
+                    className="mt-1.5 h-11"
                   />
                 </div>
                 <div>
                   <Label>Formato</Label>
                   <Select value={formato} onValueChange={(v) => setFormato(v as PostFormat)}>
-                    <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="mt-1.5 h-11"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="video">Vídeo</SelectItem>
                       <SelectItem value="estatico">Estático</SelectItem>
@@ -222,15 +222,15 @@ export const ContentForm = ({ open, onOpenChange, semanaId, calendarioId, conteu
                 <>
                   <div>
                     <Label>Gancho</Label>
-                    <Textarea value={gancho} onChange={(e) => setGancho(e.target.value)} className="mt-1.5" rows={2} />
+                    <Textarea value={gancho} onChange={(e) => setGancho(e.target.value)} className="mt-1.5 min-h-[110px]" rows={4} />
                   </div>
                   <div>
                     <Label>Desenvolvimento</Label>
-                    <Textarea value={desenvolvimento} onChange={(e) => setDesenvolvimento(e.target.value)} className="mt-1.5" rows={4} />
+                    <Textarea value={desenvolvimento} onChange={(e) => setDesenvolvimento(e.target.value)} className="mt-1.5 min-h-[180px]" rows={7} />
                   </div>
                   <div>
                     <Label>CTA</Label>
-                    <Textarea value={cta} onChange={(e) => setCta(e.target.value)} className="mt-1.5" rows={2} />
+                    <Textarea value={cta} onChange={(e) => setCta(e.target.value)} className="mt-1.5 min-h-[110px]" rows={4} />
                   </div>
                 </>
               )}
@@ -239,11 +239,11 @@ export const ContentForm = ({ open, onOpenChange, semanaId, calendarioId, conteu
                 <>
                   <div>
                     <Label>Ideia do post</Label>
-                    <Textarea value={ideia} onChange={(e) => setIdeia(e.target.value)} className="mt-1.5" rows={3} />
+                    <Textarea value={ideia} onChange={(e) => setIdeia(e.target.value)} className="mt-1.5 min-h-[140px]" rows={5} />
                   </div>
                   <div>
                     <Label>URL da Imagem/Referência</Label>
-                    <Input value={imagem} onChange={(e) => setImagem(e.target.value)} className="mt-1.5" />
+                    <Input value={imagem} onChange={(e) => setImagem(e.target.value)} className="mt-1.5 h-11" />
                   </div>
                 </>
               )}
@@ -252,7 +252,7 @@ export const ContentForm = ({ open, onOpenChange, semanaId, calendarioId, conteu
                 <>
                   <div>
                     <Label>Ideia do carrossel</Label>
-                    <Textarea value={carrIdeia} onChange={(e) => setCarrIdeia(e.target.value)} className="mt-1.5" rows={3} />
+                    <Textarea value={carrIdeia} onChange={(e) => setCarrIdeia(e.target.value)} className="mt-1.5 min-h-[140px]" rows={5} />
                   </div>
                   <div className="space-y-3">
                     <Label>Imagens do carrossel</Label>
@@ -262,6 +262,7 @@ export const ContentForm = ({ open, onOpenChange, semanaId, calendarioId, conteu
                           value={img}
                           onChange={(e) => setImagens(p => p.map((v, i) => i === idx ? e.target.value : v))}
                           placeholder={`Imagem ${idx + 1}`}
+                          className="h-11"
                         />
                         <Button
                           variant="ghost"
@@ -287,12 +288,12 @@ export const ContentForm = ({ open, onOpenChange, semanaId, calendarioId, conteu
 
               <div>
                 <Label>Legenda</Label>
-                <Textarea value={legenda} onChange={(e) => setLegenda(e.target.value)} className="mt-1.5" rows={4} />
+                <Textarea value={legenda} onChange={(e) => setLegenda(e.target.value)} className="mt-1.5 min-h-[180px]" rows={7} />
               </div>
 
               <div>
                 <Label>Link do Drive (Opcional)</Label>
-                <Input value={linkDrive} onChange={(e) => setLinkDrive(e.target.value)} className="mt-1.5" />
+                <Input value={linkDrive} onChange={(e) => setLinkDrive(e.target.value)} className="mt-1.5 h-11" />
               </div>
             </>
           ) : tipo === "story" ? (
@@ -312,7 +313,7 @@ export const ContentForm = ({ open, onOpenChange, semanaId, calendarioId, conteu
               <div>
                 <Label>Dia da semana</Label>
                 <Select value={String(diaSemana)} onValueChange={(v) => setDiaSemana(Number(v))}>
-                  <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="mt-1.5 h-11"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {[0, 1, 2, 3, 4, 5, 6].map((d) => (
                       <SelectItem key={d} value={String(d)}>
@@ -324,7 +325,7 @@ export const ContentForm = ({ open, onOpenChange, semanaId, calendarioId, conteu
               </div>
               <div>
                 <Label>Texto do Story</Label>
-                <Textarea value={storyTexto} onChange={(e) => setStoryTexto(e.target.value)} className="mt-1.5" rows={6} />
+                <Textarea value={storyTexto} onChange={(e) => setStoryTexto(e.target.value)} className="mt-1.5 min-h-[220px]" rows={9} />
               </div>
             </>
           ) : (
@@ -347,7 +348,7 @@ export const ContentForm = ({ open, onOpenChange, semanaId, calendarioId, conteu
                   value={automacaoTitulo} 
                   onChange={(e) => setAutomacaoTitulo(e.target.value)} 
                   placeholder="Ex: Sequência de Boas-vindas"
-                  className="mt-1.5" 
+                  className="mt-1.5 h-11" 
                 />
               </div>
               <div>
@@ -356,8 +357,8 @@ export const ContentForm = ({ open, onOpenChange, semanaId, calendarioId, conteu
                   value={automacaoTexto} 
                   onChange={(e) => setAutomacaoTexto(e.target.value)} 
                   placeholder="Descreva o fluxo da automação..."
-                  className="mt-1.5" 
-                  rows={8} 
+                  className="mt-1.5 min-h-[260px]" 
+                  rows={10} 
                 />
               </div>
             </>
@@ -366,19 +367,22 @@ export const ContentForm = ({ open, onOpenChange, semanaId, calendarioId, conteu
           <div>
             <Label>Status do conteúdo</Label>
             <Select value={status} onValueChange={(v) => setStatus(v as ContentStatus)}>
-              <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="mt-1.5 h-11"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="draft">Rascunho (invisível ao cliente)</SelectItem>
                 <SelectItem value="pending_review">Pendente (enviar para revisão)</SelectItem>
-                {isEdit && status === "approved" && (
+                {isEdit && (
                   <SelectItem value="approved">Aprovado</SelectItem>
                 )}
-                {isEdit && status === "rejected" && (
+                {isEdit && (
+                  <SelectItem value="published">Publicado</SelectItem>
+                )}
+                {isEdit && (
                   <SelectItem value="rejected">Recusado pelo cliente</SelectItem>
                 )}
               </SelectContent>
             </Select>
-            {isEdit && (status === "approved" || status === "rejected") && (
+            {isEdit && (isApprovedLikeStatus(status) || status === "rejected") && (
               <p className="mt-1 text-[10px] text-muted-foreground">
                 Dica: Altere para "Pendente" para reabrir o ciclo de aprovação.
               </p>

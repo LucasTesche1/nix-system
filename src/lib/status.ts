@@ -4,6 +4,8 @@ export const statusStyle = (s: ContentStatus) => {
   switch (s) {
     case "approved":
       return "bg-success/15 text-success border-success/30";
+    case "published":
+      return "border-violet-500/30 bg-violet-500/15 text-violet-600";
     case "rejected":
       return "bg-destructive/15 text-destructive border-destructive/30";
     case "pending_review":
@@ -16,6 +18,7 @@ export const statusStyle = (s: ContentStatus) => {
 export const statusDot = (s: ContentStatus) => {
   switch (s) {
     case "approved": return "bg-success";
+    case "published": return "bg-violet-500";
     case "rejected": return "bg-destructive";
     case "pending_review": return "bg-warning";
     default: return "bg-muted-foreground";

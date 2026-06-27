@@ -101,7 +101,7 @@ export interface Database {
           id: string
           semana_id: string
           tipo: 'post' | 'story' | 'automacoes'
-          status: 'draft' | 'pending_review' | 'approved' | 'rejected'
+          status: 'draft' | 'pending_review' | 'approved' | 'published' | 'rejected'
           version: number
           data_publicacao: string | null
           dia_semana: number | null
@@ -114,7 +114,7 @@ export interface Database {
           id?: string
           semana_id: string
           tipo: 'post' | 'story' | 'automacoes'
-          status?: 'draft' | 'pending_review' | 'approved' | 'rejected'
+          status?: 'draft' | 'pending_review' | 'approved' | 'published' | 'rejected'
           version?: number
           data_publicacao?: string | null
           dia_semana?: number | null
@@ -127,7 +127,7 @@ export interface Database {
           id?: string
           semana_id?: string
           tipo?: 'post' | 'story' | 'automacoes'
-          status?: 'draft' | 'pending_review' | 'approved' | 'rejected'
+          status?: 'draft' | 'pending_review' | 'approved' | 'published' | 'rejected'
           version?: number
           data_publicacao?: string | null
           dia_semana?: number | null

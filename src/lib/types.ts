@@ -9,8 +9,14 @@ export const STATUS_LABELS: Record<ContentStatus, string> = {
   draft: "Rascunho",
   pending_review: "Pendente",
   approved: "Aprovado",
+  published: "Publicado",
   rejected: "Reprovado",
 };
+
+export const APPROVED_LIKE_STATUSES: ContentStatus[] = ["approved", "published"];
+
+export const isApprovedLikeStatus = (status: ContentStatus) =>
+  APPROVED_LIKE_STATUSES.includes(status);
 
 export const CALENDAR_STATUS_LABELS: Record<CalendarStatus, string> = {
   draft: "Rascunho",
