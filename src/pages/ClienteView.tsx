@@ -11,7 +11,7 @@ import { CalendarioService } from "@/services/calendario.service";
 import { ConteudoService } from "@/services/conteudo.service";
 import { Tables } from "@/integrations/supabase/types";
 import { toast } from "sonner";
-import { MESES, DIAS_SEMANA } from "@/lib/types";
+import { MESES, DIAS_SEMANA, isApprovedLikeStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { PreservedText } from "@/components/ui/PreservedText";
@@ -63,7 +63,7 @@ const ClienteView = () => {
 
   const { total, approved } = useMemo(() => ({
     total: conteudos.length,
-    approved: conteudos.filter((c) => c.status === "approved").length
+    approved: conteudos.filter((c) => isApprovedLikeStatus(c.status)).length
   }), [conteudos]);
 
   const handleAct = async (id: string, status: "approved" | "rejected") => {
@@ -298,7 +298,9 @@ const ClienteView = () => {
                           "mt-4 rounded-xl p-4 text-sm border transition-colors",
                           c.status === "rejected"
                             ? "bg-red-50 text-red-800 border-red-100"
-                            : "bg-emerald-50 text-emerald-800 border-emerald-100"
+                            : isApprovedLikeStatus(c.status)
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-100"
+                              : "bg-muted/40 text-foreground border-border"
                         )}>
                           <div className="flex items-center gap-2 font-bold mb-1">
                             <MessageCircle className="h-3.5 w-3.5" />

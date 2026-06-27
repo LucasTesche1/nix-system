@@ -1,5 +1,6 @@
 import { api } from "@/lib/api";
 import { Tables } from "@/integrations/supabase/types";
+import { isApprovedLikeStatus } from "@/lib/types";
 
 export type CalendarioComCliente = Tables<'calendarios'> & {
   cliente: Tables<'clientes'> | null;
@@ -107,10 +108,10 @@ export const CalendarioService = {
       
       tally[cid] ??= { tot: 0, ok: 0, hasActivity: false };
       tally[cid].tot++;
-      if (c.status === "approved") tally[cid].ok++;
+      if (isApprovedLikeStatus(c.status)) tally[cid].ok++;
 
-      // Detecção de atividade: status em (approved, rejected) e updated_at > ultimo_acesso
-      if (["approved", "rejected"].includes(c.status)) {
+      // Detecção de atividade: status em (approved, published, rejected) e updated_at > ultimo_acesso
+      if (isApprovedLikeStatus(c.status) || c.status === "rejected") {
         const lastAccess = cal?.ultimo_acesso_profissional;
         const updatedAt = c.updated_at;
         

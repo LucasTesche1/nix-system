@@ -158,11 +158,9 @@ export const ConteudoService = {
     };
 
     if (isEdit && oldConteudo) {
-      // Regra Crítica: Se conteúdo aprovado for editado -> pending_review
       const newVersion = (oldConteudo.version ?? 1) + 1;
-      const newStatus = oldConteudo.status === "approved" ? "pending_review" : status;
       conteudoPayload.version = newVersion;
-      conteudoPayload.status = newStatus;
+      conteudoPayload.status = status;
     } else {
       conteudoPayload.version = 1;
       conteudoPayload.status = status;
