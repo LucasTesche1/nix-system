@@ -46,6 +46,18 @@ export const useConteudos = () => {
     },
   });
 
+  const moveConteudo = useMutation({
+    mutationFn: ({ conteudoId, semanaId }: { conteudoId: string; semanaId: string }) =>
+      ConteudoService.transferToSemana(conteudoId, semanaId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["conteudos"] });
+      toast.success("Conteúdo transferido com sucesso");
+    },
+    onError: (error: Error) => {
+      toast.error("Erro ao transferir conteúdo: " + error.message);
+    },
+  });
+
   const saveConteudo = useMutation({
     mutationFn: (payload: any) => ConteudoService.save(payload),
     onSuccess: (_, variables) => {
@@ -62,6 +74,7 @@ export const useConteudos = () => {
     useConteudosBySemanas,
     updateStatus,
     softDelete,
+    moveConteudo,
     saveConteudo,
   };
 };

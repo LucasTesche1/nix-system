@@ -1,5 +1,6 @@
 import { api } from "@/lib/api";
 import { Tables } from "@/integrations/supabase/types";
+import { isApprovedLikeStatus } from "@/lib/types";
 
 export type ConteudoCompleto = Tables<'conteudos'> & {
   post?: (Tables<'posts'> & {
@@ -124,6 +125,36 @@ export const ConteudoService = {
       .update({ deleted_at: new Date().toISOString() })
       .eq("id", id);
     if (error) throw error;
+  },
+
+  async transferToSemana(conteudoId: string, semanaId: string) {
+    const { data: conteudo, error: fetchError } = await api
+      .from("conteudos")
+      .select("id, semana_id, status, version")
+      .eq("id", conteudoId)
+      .is("deleted_at", null)
+      .single();
+
+    if (fetchError) throw fetchError;
+    if (!conteudo) throw new Error("Conteúdo não encontrado");
+    if (conteudo.semana_id === semanaId) return conteudo.id;
+
+    const nextStatus = isApprovedLikeStatus(conteudo.status)
+      ? "pending_review"
+      : conteudo.status;
+
+    const { error } = await api
+      .from("conteudos")
+      .update({
+        semana_id: semanaId,
+        status: nextStatus,
+        version: (conteudo.version ?? 1) + 1,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", conteudoId);
+
+    if (error) throw error;
+    return conteudo.id;
   },
 
   async save(payload: {
