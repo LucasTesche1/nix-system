@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type DragEvent } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Plus, Share2, Copy, Check, Loader2, Trash2, Pencil, Calendar, ShieldCheck, AlertCircle, MessageCircle, FileDown } from "lucide-react";
+import { ArrowLeft, Plus, Share2, Copy, Check, Loader2, Trash2, Pencil, Calendar, ShieldCheck, AlertCircle, MessageCircle, FileDown, GripVertical } from "lucide-react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +19,7 @@ import { PreservedText } from "@/components/ui/PreservedText";
 const CalendarioEditor = () => {
   const { id = "" } = useParams<{ id: string }>();
   const { useCalendario, addSemana, updateSemana, ativarCalendario, registrarAcesso, exportarPDF } = useCalendarios();
-  const { useSemanas, useConteudosBySemanas, softDelete: deleteItem } = useConteudos();
+  const { useSemanas, useConteudosBySemanas, softDelete: deleteItem, moveConteudo } = useConteudos();
 
   useEffect(() => {
     if (id) {
@@ -35,6 +35,8 @@ const CalendarioEditor = () => {
   const [copied, setCopied] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<{ semanaId: string; conteudo?: ConteudoCompleto } | null>(null);
+  const [draggedItem, setDraggedItem] = useState<{ conteudoId: string; semanaId: string } | null>(null);
+  const [dropTargetSemanaId, setDropTargetSemanaId] = useState<string | null>(null);
 
   const handleExportPDF = async () => {
     try {
@@ -186,6 +188,49 @@ const CalendarioEditor = () => {
     ativarCalendario.mutate(id);
   };
 
+  const resetDragState = () => {
+    setDraggedItem(null);
+    setDropTargetSemanaId(null);
+  };
+
+  const handleConteudoDragStart = (
+    event: DragEvent<HTMLDivElement>,
+    conteudoId: string,
+    semanaId: string
+  ) => {
+    if (moveConteudo.isPending) {
+      event.preventDefault();
+      return;
+    }
+
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", conteudoId);
+    setDraggedItem({ conteudoId, semanaId });
+  };
+
+  const handleSemanaDragOver = (event: DragEvent<HTMLElement>, semanaId: string) => {
+    if (!draggedItem || moveConteudo.isPending) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    if (dropTargetSemanaId !== semanaId) {
+      setDropTargetSemanaId(semanaId);
+    }
+  };
+
+  const handleSemanaDrop = (event: DragEvent<HTMLElement>, semanaId: string) => {
+    event.preventDefault();
+
+    if (!draggedItem || draggedItem.semanaId === semanaId) {
+      resetDragState();
+      return;
+    }
+
+    moveConteudo.mutate(
+      { conteudoId: draggedItem.conteudoId, semanaId },
+      { onSettled: resetDragState }
+    );
+  };
+
   if (loadingCal || loadingSemanas || !cal) {
     return (
       <AdminLayout>
@@ -283,10 +328,23 @@ const CalendarioEditor = () => {
       </div>
 
       <div className="space-y-6">
+        <div className="rounded-2xl border border-dashed border-border bg-secondary/20 px-4 py-3 text-sm text-muted-foreground">
+          Arraste os cards entre as semanas para adiantar ou adiar os conteúdos.
+        </div>
+
         {semanas.map((s) => {
           const items = conteudos.filter((c) => c.semana_id === s.id);
+          const isDropTarget = dropTargetSemanaId === s.id && draggedItem?.semanaId !== s.id;
           return (
-            <section key={s.id} className="rounded-2xl border border-border bg-card p-4 md:p-6">
+            <section
+              key={s.id}
+              onDragOver={(event) => handleSemanaDragOver(event, s.id)}
+              onDrop={(event) => handleSemanaDrop(event, s.id)}
+              className={cn(
+                "rounded-2xl border border-border bg-card p-4 transition-colors md:p-6",
+                isDropTarget && "border-primary bg-primary/5"
+              )}
+            >
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <Input
                   defaultValue={s.nome ?? ""}
@@ -307,16 +365,32 @@ const CalendarioEditor = () => {
                 </div>
               </div>
               {items.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
-                  Nenhum conteúdo nesta semana
+                <div
+                  className={cn(
+                    "rounded-xl border border-dashed py-8 text-center text-sm text-muted-foreground transition-colors",
+                    isDropTarget ? "border-primary bg-primary/5 text-foreground" : "border-border"
+                  )}
+                >
+                  {isDropTarget ? "Solte aqui para mover o conteúdo" : "Nenhum conteúdo nesta semana"}
                 </div>
               ) : (
                 <div className="grid gap-3 sm:grid-cols-2">
                   {items.map((c) => (
-                    <div key={c.id} className="group rounded-xl border border-border bg-background p-4">
+                    <div
+                      key={c.id}
+                      draggable={!moveConteudo.isPending}
+                      onDragStart={(event) => handleConteudoDragStart(event, c.id, s.id)}
+                      onDragEnd={resetDragState}
+                      className={cn(
+                        "group rounded-xl border border-border bg-background p-4 transition-opacity",
+                        moveConteudo.isPending ? "cursor-not-allowed" : "cursor-grab active:cursor-grabbing",
+                        draggedItem?.conteudoId === c.id && "opacity-50"
+                      )}
+                    >
                       <div className="mb-2 flex items-start justify-between gap-2">
                         <div>
                           <div className="flex items-center gap-2">
+                            <GripVertical className="h-4 w-4 text-muted-foreground" />
                             <span className="rounded-md bg-secondary px-2 py-0.5 text-xs font-semibold uppercase tracking-wider">
                               {c.tipo === "post"
                                 ? (c.post as any)?.formato ?? "post"
